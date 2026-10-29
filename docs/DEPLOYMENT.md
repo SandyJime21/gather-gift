@@ -50,7 +50,7 @@ The persistent disk is mounted at `/var/data`, with photos at `/var/data/uploads
 
 Passwords containing `@`, `:`, `/`, `#`, `%`, or other URL-reserved characters must be URL encoded in `DATABASE_URL`. MySQL certificates and hostname verification are required in production. Put all secrets in Render settings or secret files, never in a `VITE_` variable or the repository. Do not set the local example `RATELIMIT_STORAGE_URI=memory://` on Render.
 
-Production fails early if the origin, secret, managed database, Redis, or email configuration is missing/unsafe. SMTP is required because password recovery, parent PIN recovery, verification, and account deletion backups depend on it. Startup validation checks settings; inbox delivery still needs a real test.
+Production fails early if the origin, secret, managed database, or Redis configuration is missing/unsafe. Missing email settings do not block startup or database migrations. Password/PIN recovery, verification, and deletion backups remain unavailable until SMTP is configured; deletion stops before removing data if its backup cannot be sent. When SMTP is configured, production requires STARTTLS. Inbox delivery still needs a real test.
 
 ## Optional integrations
 

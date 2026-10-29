@@ -17,7 +17,7 @@ def validate_production(config):
     origin = urlsplit(config.get('FRONTEND_ORIGIN') or '')
     if origin.scheme != 'https' or not origin.hostname or origin.path not in ('', '/') or origin.query or origin.fragment or origin.username:
         raise RuntimeError('Production FRONTEND_ORIGIN must be your public HTTPS origin without a path.')
-    if not config.get('SMTP_HOST') or not config.get('MAIL_FROM') or not config.get('SMTP_STARTTLS'):
-        raise RuntimeError('Production requires SMTP_HOST, MAIL_FROM, and SMTP_STARTTLS=true for recovery and deletion backups.')
+    if config.get('SMTP_HOST') and config.get('MAIL_FROM') and not config.get('SMTP_STARTTLS'):
+        raise RuntimeError('Production SMTP requires SMTP_STARTTLS=true when email is configured.')
     if bool(config.get('STRIPE_SECRET_KEY')) != bool(config.get('STRIPE_WEBHOOK_SECRET')):
         raise RuntimeError('Configure both Stripe secrets or leave both empty to keep checkout disabled.')

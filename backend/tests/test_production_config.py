@@ -14,13 +14,20 @@ def test_valid_production_settings_allow_free_launch():
     validate_production(valid_settings())
 
 
+@pytest.mark.parametrize('host,sender',[('',''),('smtp.example.com',''),('','app@example.com')])
+def test_database_migrations_and_startup_do_not_require_email(host,sender):
+    config=valid_settings()
+    config.update(SMTP_HOST=host,MAIL_FROM=sender)
+    validate_production(config)
+
+
 @pytest.mark.parametrize('field,value',[
     ('SECRET_KEY','local-only-change-me'),
     ('SQLALCHEMY_DATABASE_URI','sqlite:///local.db'),
     ('SQLALCHEMY_DATABASE_URI','mysql+pymysql://u:p@127.0.0.1/gifts'),
     ('FRONTEND_ORIGIN','http://localhost:5173'),
     ('FRONTEND_ORIGIN','https://example.com/some-path'),
-    ('SMTP_HOST',''), ('MAIL_FROM',''), ('SMTP_STARTTLS',False),
+    ('SMTP_STARTTLS',False),
     ('STRIPE_SECRET_KEY','sk_test_placeholder'),
 ])
 def test_production_rejects_missing_or_unsafe_settings(field,value):

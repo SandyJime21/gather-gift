@@ -17,7 +17,7 @@ October 28, 2026. Prepared for GitHub and a Render staging deployment. No reposi
 - GitHub Actions: frontend tests/build, backend tests, source credential checks, fresh MySQL migration/schema comparison, Docker image build, and read-only repository permissions.
 - Render Blueprint: automatic deploy only after CI passes, migrations in the pre-deploy stage, Redis sessions/rate limits, persistent photo storage, and `/ready` health checking.
 - Docker: Node 22 build, Python 3.12 runtime, Gunicorn workers/threads, bounded request timeout, and container logging. Migration commands are separate from worker startup.
-- Production validates the public HTTPS origin, sufficiently long app secret, external MySQL, Redis, working SMTP configuration, and paired payment keys. MySQL connections verify TLS certificates/hostnames and use connection health checks.
+- Production validates the public HTTPS origin, sufficiently long app secret, external MySQL, Redis, encrypted SMTP when configured, and paired payment keys. Missing SMTP no longer blocks startup/migrations; email-dependent actions stay unavailable until configured. MySQL connections verify TLS certificates/hostnames and use connection health checks.
 - Optional payments, ad prices, product search, and affiliate tracking start disabled. Core manual wishlists/preferences still work.
 - Ignore rules and the source packaging script exclude local users, photos, session files, email previews, exports, dependency folders, generated test reports, and environment secrets.
 
