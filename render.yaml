@@ -23,6 +23,8 @@
         generateValue: true
       - key: DATABASE_URL
         sync: false
+      - key: DATABASE_SSL_CA
+        value: /app/backend/certs/railway-mysql-ca.crt
       - key: RATELIMIT_STORAGE_URI
         value: "appsql://"
       - key: FRONTEND_ORIGIN

@@ -73,13 +73,12 @@ def create_app(test_config=None):
 
     from .production import validate_production
     validate_production(app.config)
-    if app.config['APP_ENV'] == 'production':
-        import certifi
-        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-            'pool_pre_ping': True, 'pool_recycle': 280,
-            'connect_args': {'connect_timeout': 10, 'ssl_ca': os.getenv('DATABASE_SSL_CA') or certifi.where(),
-                             'ssl_verify_cert': True, 'ssl_verify_identity': True},
-        }
+    from .database_tls import mysql_engine_options
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        **app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {}),
+        **mysql_engine_options(app.config['SQLALCHEMY_DATABASE_URI'],
+            production=app.config['APP_ENV'] == 'production', ca_file=os.getenv('DATABASE_SSL_CA') or None),
+    }
 
     # Save and serve uploads from the same absolute directory. Flask resolves
     # relative send_from_directory paths against app.root_path, unlike Path.write_bytes.
