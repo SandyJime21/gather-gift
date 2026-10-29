@@ -3,10 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Gather &amp; Gift" />
+    <script>
+      (() => {
+        const support = /^\/support(?:\/|$)/.test(location.pathname);
+        const manifest = document.createElement('link');
+        manifest.rel = 'manifest';
+        manifest.href = support ? '/support.webmanifest' : '/manifest.webmanifest';
+        document.head.appendChild(manifest);
+        if (support) document.querySelector('meta[name="apple-mobile-web-app-title"]').content = 'G&G Support';
+      })();
+    </script>
     <meta name="theme-color" content="#ffe3ee" />
     <title>Gather &amp; Gift | Free Family Gift Registry &amp; Wishlists</title>
     <meta name="description" content="Save wishes from different stores, share lists with family and friends, and find gifts they actually want. Your family gift registry, all in one place." />

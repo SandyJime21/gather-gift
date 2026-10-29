@@ -127,6 +127,8 @@ function BuyingNotice() {
 }
 
 function SiteHeader() {
+  const {pathname}=useLocation();
+  const supportArea=/^\/support(?:\/|$)/.test(pathname);
   const { user, signOut } = useSession();
   const navigate = useNavigate();
   const [error, setError] = useState("");
@@ -137,7 +139,7 @@ function SiteHeader() {
     } catch (err) {
       setError(err.message);
     } finally {
-      navigate("/login", { replace: true });
+      navigate(user?.is_support ? "/support/login" : "/login", { replace: true });
     }
   };
   return (
@@ -147,7 +149,7 @@ function SiteHeader() {
         <Navbar.Brand as={Link} to="/" className="brand">
           <span aria-hidden="true">✿</span> Gather &amp; Gift
         </Navbar.Brand>
-        <InstallApp />
+        <InstallApp key={supportArea?'support':'family'} support={supportArea} hidden={supportArea && pathname!=='/support/login'}/>
         {user && (
           <>
             
@@ -283,7 +285,7 @@ function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Routes>}
         </main>
-        <footer className="site-footer"><span>&copy; {new Date().getFullYear()} Gather &amp; Gift. All rights reserved.</span><span>Made for thoughtful giving.</span>{!user?.is_child && <Link to={user ? '/settings?tab=help' : '/advertise'}>{user ? 'Help & support' : 'Advertise with us'}</Link>}{!user && <Link to="/support/login" title="Sign in to the staff support and developer portal.">Support login</Link>}{user?.is_support && <Link to="/support">Support portal</Link>}</footer>
+        <footer className="site-footer"><span>&copy; {new Date().getFullYear()} Gather &amp; Gift. All rights reserved.</span><span>Made for thoughtful giving.</span>{!user?.is_child && <Link to={user ? '/settings?tab=help' : '/advertise'}>{user ? 'Help & support' : 'Advertise with us'}</Link>}{!user && <a href="/support/login" title="Sign in to the staff support and developer portal.">Support login</a>}{user?.is_support && <Link to="/support">Support portal</Link>}</footer>
         <PageHelpAssistant user={user}/>
         </div>
       </BrowserRouter>

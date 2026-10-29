@@ -196,6 +196,8 @@ describe("separate support sign-in", () => {
       return jsonResponse({ error: `Unexpected request: ${url}` }, 404);
     }));
     render(<App />);
+    expect(await screen.findByRole("button",{name:"Download Support"})).toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:"Download"})).not.toBeInTheDocument();
     fireEvent.change(await screen.findByLabelText("Email address"), { target: { value: "support@example.com" } });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "a-separate-strong-support-password" } });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));

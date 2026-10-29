@@ -1,7 +1,7 @@
 import {afterEach,expect,it,vi} from 'vitest';
 import {act,cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
 import InstallApp from './InstallApp.jsx';
-afterEach(()=>{cleanup();vi.unstubAllGlobals();vi.restoreAllMocks();});
+afterEach(()=>{cleanup();document.querySelector('link[rel="manifest"]')?.remove();vi.unstubAllGlobals();vi.restoreAllMocks();});
 
 it('shows iPad Home Screen instructions when no automatic installer is available',()=>{
  vi.spyOn(navigator,'userAgent','get').mockReturnValue('iPad');
@@ -36,4 +36,21 @@ it('does not offer installation when already running as an installed app',()=>{
  vi.stubGlobal('matchMedia',vi.fn(()=>({matches:true,addEventListener:vi.fn(),removeEventListener:vi.fn()})));
  render(<InstallApp/>);
  expect(screen.queryByRole('button',{name:'Download'})).not.toBeInTheDocument();
+});
+
+it('offers the support app with its own manifest and launch instructions',()=>{
+ render(<InstallApp support/>);
+ expect(document.querySelector('link[rel="manifest"]')).toHaveAttribute('href','/support.webmanifest');
+ expect(screen.queryByRole('button',{name:'Download'})).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Download Support'}));
+ expect(screen.getByText('Download Gather & Gift Support')).toBeInTheDocument();
+ expect(screen.getByText(/A staff account is still required/)).toBeInTheDocument();
+});
+
+it('restores the main manifest when returning to the normal app',()=>{
+ const view=render(<InstallApp support/>);
+ view.rerender(<InstallApp support={false}/>);
+ expect(document.querySelector('link[rel="manifest"]')).toHaveAttribute('href','/manifest.webmanifest');
+ expect(screen.getByRole('button',{name:'Download'})).toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'Download Support'})).not.toBeInTheDocument();
 });
