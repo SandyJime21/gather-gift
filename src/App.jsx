@@ -283,7 +283,7 @@ function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Routes>}
         </main>
-        <footer className="site-footer"><span>&copy; {new Date().getFullYear()} Gather &amp; Gift. All rights reserved.</span><span>Made for thoughtful giving.</span>{!user?.is_child && <Link to={user ? '/settings?tab=help' : '/advertise'}>{user ? 'Help & support' : 'Advertise with us'}</Link>}</footer>
+        <footer className="site-footer"><span>&copy; {new Date().getFullYear()} Gather &amp; Gift. All rights reserved.</span><span>Made for thoughtful giving.</span>{!user?.is_child && <Link to={user ? '/settings?tab=help' : '/advertise'}>{user ? 'Help & support' : 'Advertise with us'}</Link>}{!user && <Link to="/support/login" title="Sign in to the staff support and developer portal.">Support login</Link>}{user?.is_support && <Link to="/support">Support portal</Link>}</footer>
         <PageHelpAssistant user={user}/>
         </div>
       </BrowserRouter>
