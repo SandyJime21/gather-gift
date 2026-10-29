@@ -25,7 +25,9 @@
         sync: false
       - key: RATELIMIT_STORAGE_URI
         value: "appsql://"
-      # Same-origin frontend uses RENDER_EXTERNAL_URL automatically.
+      - key: FRONTEND_ORIGIN
+        value: https://gather-gift.onrender.com
+      # The client uses same-origin /api requests; no separate API origin is needed.
       - key: SERPAPI_API_KEY
         value: ""
       - key: STRIPE_SECRET_KEY

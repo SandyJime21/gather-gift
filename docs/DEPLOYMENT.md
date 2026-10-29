@@ -46,7 +46,7 @@ The persistent disk is mounted at `/var/data`, with photos at `/var/data/uploads
 | `SMTP_STARTTLS` | `true` |
 | `SMTP_USERNAME`, `SMTP_PASSWORD` | Provider credentials, if required |
 | `MAIL_FROM` | Verified sender address accepted by the provider |
-| `FRONTEND_ORIGIN` | Omit for the initial `onrender.com` domain: the app uses `RENDER_EXTERNAL_URL`. Set to your exact `https://your-domain.example` origin when adding a custom domain. |
+| `FRONTEND_ORIGIN` | `https://gather-gift.onrender.com` (Blueprint). Update to your exact HTTPS origin when adding a custom domain. Without an explicit value, the app uses Render's `RENDER_EXTERNAL_URL`. |
 
 Passwords containing `@`, `:`, `/`, `#`, `%`, or other URL-reserved characters must be URL encoded in `DATABASE_URL`. MySQL certificates and hostname verification are required in production. Put all secrets in Render settings or secret files, never in a `VITE_` variable or the repository. Do not set the local example `RATELIMIT_STORAGE_URI=memory://` on Render.
 
@@ -99,3 +99,10 @@ Existing logins will expire once when switching storage; users sign in again. No
 ## Current verification limits
 
 Source changes are pushed to GitHub; Render deployment status must be checked in the Render dashboard. The local Docker daemon is unavailable, so the actual container build is assigned to GitHub CI. Managed-MySQL TLS, deployed database/network access, SMTP inbox delivery, Stripe test-mode round trips, and real device acceptance depend on the configured deployment and cannot be certified by local unit tests.
+
+
+## Current Railway certificate setup
+
+A verified connection check against the database selected in the local `.env` failed because the server presents a self-signed certificate chain and no custom CA is configured. No migrations were applied during that check. Obtain the CA from the actual Railway MySQL service through a trusted account connection, upload it as a Render secret file, and set `DATABASE_SSL_CA` to its path (for example `/etc/secrets/railway-mysql-ca.pem`). The certificate must also validate the database hostname. Keep certificate and hostname verification enabled.
+
+The private `.env.render` file contains the selected database connection and public frontend origin for Render's **Environment ? Add from .env**. It deliberately keeps Render's existing generated `SECRET_KEY` instead of copying the local development secret. Both `.env` and `.env.render` are ignored by Git. Finish the certificate setup before deploying or applying migrations through this connection. The client uses same-origin `/api` requests with `VITE_API_BASE_URL` empty.
