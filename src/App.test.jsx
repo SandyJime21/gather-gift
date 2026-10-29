@@ -150,6 +150,7 @@ describe("family gift planning flow", () => {
     fireEvent.click(screen.getByRole("button", { name: "+ Add another person or pet" }));
     fireEvent.change(screen.getByLabelText("Family member 2 name"), { target: { value: "Mochi" } });
     fireEvent.change(screen.getByLabelText("Family member 2 type"), { target: { value: "pet" } });
+    expect(screen.queryByLabelText("Family member 2 relationship")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Create household" }));
     expect(await screen.findByRole("link", { name: /the example family/i })).toBeInTheDocument();
     const createRequest = fetch.mock.calls.find(([url, options]) => url === "/api/households" && options?.method === "POST");
