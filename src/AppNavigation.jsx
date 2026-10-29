@@ -6,5 +6,5 @@ export function AppIcon({name}) {
 export default function AppNavigation(){
  const {pathname}=useLocation();
  const entries=[['/','wishes','My wishes'],['/following','following','Following'],['/discover','discover','Discover'],['/gifting','gifting','My gifting'],['/settings','settings','Settings']];
- return <nav className="app-navigation" aria-label="Main navigation">{entries.map(([to,icon,label])=>{const active=to==='/'?['/','/wishlist'].includes(pathname):pathname.startsWith(to)||to==='/following'&&pathname==='/games'||to==='/gifting'&&pathname==='/buying-now';return <Link key={to} to={to} aria-current={active?'page':undefined}><AppIcon name={icon}/><span>{label}</span></Link>;})}</nav>;
+ return <nav className="app-navigation" aria-label="Main navigation">{entries.map(([to,icon,label])=>{const active=to==='/'?['/','/wishlist'].includes(pathname):pathname.startsWith(to)||to==='/following'&&pathname==='/games'||to==='/gifting'&&pathname==='/buying-now';return <Link key={to} to={to} aria-label={label} title={label} aria-current={active?'page':undefined}><AppIcon name={icon}/><span>{label}</span></Link>;})}</nav>;
 }
