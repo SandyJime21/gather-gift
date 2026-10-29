@@ -19,3 +19,8 @@ Sibling access does not grant adult access. With sibling switching disabled, the
 Implementation: parent-owned child permission map stored in the existing account JSON settings; no database migration required. Notification preference editing preserves this map and cannot write its keys. Ownership transfer starts with optional permissions off for the new supervising parent unless that parent has separately granted access.
 
 Verification: default-deny API requests, permission validation, unauthorized changes, approval/revocation, cached search-result rejection, manual wishes, enabled links/search/pet flows, locked sibling switching, game restrictions, and parent PIN recovery are covered by backend regressions. Parent permission switches and child UI are covered by frontend tests. This is an access-control implementation, not a legal compliance certification or a guarantee that third-party online results contain only suitable content.
+
+
+The Child mode & PIN button appears near the top of the editable child profile. One parent PIN is shared across that parent's children; each child has separate list and activity selections. A child login/password is not required to configure shared-device child mode. Changes to approved lists or enabled status end current child sessions. An enabled child must have at least one selected list. Company employee profiles, pets, adults, children, and unrelated users cannot use this parent-only configuration endpoint.
+
+Requested letters grant their new list to the selected child, but the parent can revoke that list in this dialog. Future-dated letters remain hidden until their scheduled date. Once the parent has explicitly selected lists, the server does not silently re-add unchecked letter lists.

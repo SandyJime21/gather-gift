@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 from flask import request, jsonify
 from .api import api, authenticated, error, require_household_admin, profile_access
 from .extensions import db
-from .models import Household, HouseholdProfileAccess, PersonProfile, Wishlist, WishlistLetter, SharedTheme
+from .models import Household, HouseholdProfileAccess, PersonProfile, Wishlist, WishlistLetter, SharedTheme, User, ChildWishlistAccess
 
 
 def letter_dict(row):
@@ -75,6 +75,9 @@ def manage_wishlist_letters(home_id):
         db.session.flush()
         letter=WishlistLetter(theme_id=art.id if art else None,household_id=home_id,profile_id=profile.id,wishlist_id=wishlist.id,sender_name=sender,send_on=send_on,created_by_id=request.current_user.id)
         db.session.add(letter)
+        child=db.session.get(User,profile.account_user_id) if profile.account_user_id else None
+        if child and child.is_child and child.parent_user_id==request.current_user.id:
+            db.session.add(ChildWishlistAccess(user_id=child.id,wishlist_id=wishlist.id))
         letters.append(letter)
     db.session.commit()
     return jsonify(letters=[letter_dict(row) for row in letters]),201

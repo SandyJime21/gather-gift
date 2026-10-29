@@ -3629,13 +3629,19 @@ def approved_child_lists(child):
         return []
     ids = db.session.query(ChildWishlistAccess.wishlist_id).filter_by(user_id=child.id)
     lists = Wishlist.query.filter(Wishlist.id.in_(ids), Wishlist.profile_id == profile.id).all()
-    if not lists:
+    explicit_lists=((parent.notification_preferences or {}).get('child_access',{}).get(str(child.id),{})).get('lists_configured',False)
+    if not lists and not explicit_lists:
         wishlist = default_child_wishlist(profile.id)
         db.session.add(ChildWishlistAccess(user_id=child.id, wishlist_id=wishlist.id))
         db.session.commit()
         lists = [wishlist]
     from ..wishlist_letters import active_letters
+    from ..models import WishlistLetter
     letter_ids = [row.wishlist_id for row in active_letters(profile.id)]
+    scheduled_ids={row.wishlist_id for row in WishlistLetter.query.filter_by(profile_id=profile.id).all()}
+    lists=[row for row in lists if row.id not in scheduled_ids or row.id in letter_ids]
+    if explicit_lists:
+        return lists
     extra = Wishlist.query.filter(Wishlist.id.in_(letter_ids), Wishlist.profile_id == profile.id).all()
     return list({row.id: row for row in lists + extra}.values())
 
@@ -3687,7 +3693,8 @@ def child_me():
         PersonProfile.profile_type == "pet",
     ).order_by(PersonProfile.display_name).all() if household_ids and controls["manage_pets"] else []
     from ..wishlist_letters import active_letters, letter_dict
-    letters = [letter_dict(row) for row in active_letters(child_profile.id)] if child_profile and lists else []
+    allowed_ids={row.id for row in lists}
+    letters = [letter_dict(row) for row in active_letters(child_profile.id) if row.wishlist_id in allowed_ids] if child_profile and lists else []
     return jsonify({'name': child.name, 'controls': controls, 'letters': letters, 'wishlists': [{'id': wishlist.id, 'title': wishlist.title,
         'items': [{'id': row.id, 'name': row.name, 'description': row.description}
             for row in WishlistItem.query.join(WishlistItemWishlist).filter(WishlistItemWishlist.wishlist_id == wishlist.id).order_by(WishlistItem.created_at.desc()).all()]}
