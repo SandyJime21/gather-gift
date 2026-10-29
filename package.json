@@ -8,7 +8,12 @@
     "dev": "concurrently --kill-others \"npm start\" \"python app.py\"",
     "dev:all": "npm run dev",
     "build": "vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:upgrade": "node scripts/database.mjs upgrade",
+    "db:migrate": "node scripts/database.mjs migrate",
+    "db:current": "node scripts/database.mjs current",
+    "db:check": "node scripts/database.mjs check",
+    "db:heads": "node scripts/database.mjs heads"
   },
   "dependencies": {
     "react": "^18.3.1",

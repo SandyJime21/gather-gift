@@ -2,6 +2,8 @@
 
 # Family Gift Registry
 
+Database updates from your terminal: [database commands](docs/DATABASE_COMMANDS.md). Run `npm.cmd run db:upgrade` to apply migrations to the database configured in your environment.
+
 Current feature/navigation inventory and beta launch checklist: [MVP inventory](docs/MVP_INVENTORY.md). Independent reviewer instructions: [Copilot review handoff](docs/COPILOT_MVP_REVIEW.md). These describe the latest application; some older sections below record earlier iterations.
 
 
