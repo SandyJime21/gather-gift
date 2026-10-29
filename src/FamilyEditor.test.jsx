@@ -1,9 +1,39 @@
 ﻿import { afterEach, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import FamilyEditor from './FamilyEditor.jsx';
 import { api } from './lib/api.js';
 vi.mock('./lib/api.js',()=>({api:vi.fn(),mediaUrl:p=>p}));
+vi.mock('./PhotoCropper.jsx',()=>({usePhotoCrop:()=>({crop:async file=>file || null,cropper:null})}));
 afterEach(()=>vi.clearAllMocks());
+it.each([false,true])('adds a member with details open and a photo below, retrying without duplicate profiles: %s',async retry=>{
+ const home={id:1,name:'Family',role:'owner'};let profile=null,created=0,uploads=0;
+ api.mockImplementation(async(path,options)=>{
+  if(path==='/household-session/switch')return {};
+  if(path==='/households/1')return {household:home,profiles:profile?[profile]:[]};
+  if(path==='/households/1/profiles'){created++;profile={id:9,...JSON.parse(options.body),can_edit:true};return {profile};}
+  if(path==='/profiles/9'&&options?.method==='PATCH'){Object.assign(profile,JSON.parse(options.body));return {profile};}
+  if(path==='/households/1/profiles/9/relationship')return {};
+  if(path==='/profiles/9/photo'){
+   uploads++;expect(options.body.get('image').name).toBe('member.png');
+   if(retry && uploads===1)throw new Error('Store unavailable');
+   profile.photo_path='/api/uploads/member.png';return {photo_path:profile.photo_path};
+  }
+  return {};
+ });
+ render(<FamilyEditor households={[home]} refresh={async()=>{}} BirthdayInput={()=>null} RelationshipSelect={()=>null} initialHome="1" initialPerson="new" label="Add member"/>);
+ fireEvent.click(screen.getByRole('button',{name:'Add member'}));
+ const name=await screen.findByLabelText('Member name');
+ const details=name.closest('details');expect(details).toHaveAttribute('open');
+ const photo=screen.getByLabelText('Add profile photo');
+ expect(details.compareDocumentPosition(photo)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+ fireEvent.change(name,{target:{value:'Mia'}});
+ fireEvent.change(photo,{target:{files:[new File(['photo'],'member.png',{type:'image/png'})]}});
+ await waitFor(()=>expect(photo).toHaveValue(''));
+ fireEvent.click(screen.getByRole('button',{name:'Save changes'}));
+ if(retry){await screen.findByText(/Profile saved, but the photo could not be uploaded/);fireEvent.click(screen.getByRole('button',{name:'Save changes'}));}
+ await screen.findByText('Saved.');
+ expect(created).toBe(1);expect(uploads).toBe(retry?2:1);
+});
 it('edits family and member names in the same dialog',async()=>{
  const home={id:1,name:'Old family',role:'owner'},person={id:7,display_name:'Alex',profile_type:'person',relationship:'dad',can_edit:true};
  api.mockImplementation(async(path,options)=>{
