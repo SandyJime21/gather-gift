@@ -1,4 +1,5 @@
 import shutil
+import os
 from pathlib import Path
 from uuid import uuid4
 
@@ -23,7 +24,8 @@ def app():
             "SQLALCHEMY_DATABASE_URI": "sqlite://",
             "SQLALCHEMY_ENGINE_OPTIONS": {},
             "RATELIMIT_ENABLED": False,
-            "SESSION_TYPE": "cachelib",
+            "SESSION_TYPE": os.getenv('TEST_SESSION_BACKEND', 'cachelib'),
+            "RATELIMIT_STORAGE_URI": 'appsql://' if os.getenv('TEST_SESSION_BACKEND') == 'mysql' else 'memory://',
             "SESSION_FILE_DIR": str(session_directory),
             "SESSION_CACHELIB": FileSystemCache(cache_dir=str(session_directory), threshold=500),
         }

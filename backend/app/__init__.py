@@ -35,12 +35,12 @@ def create_app(test_config=None):
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.getenv("APP_ENV") == "production",
-        SESSION_TYPE=os.getenv("SESSION_TYPE", "redis" if os.getenv("APP_ENV") == "production" else "cachelib"),
+        SESSION_TYPE=os.getenv("SESSION_TYPE", "mysql" if os.getenv("APP_ENV") == "production" else "cachelib"),
         SESSION_FILE_DIR=str(Path(__file__).resolve().parents[1] / "instance" / "sessions"),
         SESSION_USE_SIGNER=False,
         SESSION_PERMANENT=True,
         PERMANENT_SESSION_LIFETIME=timedelta(days=7),
-        RATELIMIT_STORAGE_URI=os.getenv("RATELIMIT_STORAGE_URI", os.getenv("REDIS_URL", "memory://")),
+        RATELIMIT_STORAGE_URI=os.getenv("RATELIMIT_STORAGE_URI", "appsql://" if os.getenv("APP_ENV") == "production" else "memory://"),
         MAX_CONTENT_LENGTH=int(os.getenv("MAX_CONTENT_LENGTH", 8 * 1024 * 1024)),
         STRIPE_SECRET_KEY=os.getenv("STRIPE_SECRET_KEY", ""),
         STRIPE_WEBHOOK_SECRET=os.getenv("STRIPE_WEBHOOK_SECRET", ""),
@@ -87,20 +87,13 @@ def create_app(test_config=None):
 
     if os.getenv("APP_ENV") == "production" and not os.getenv("SECRET_KEY"):
         raise RuntimeError("SECRET_KEY must be configured in production.")
-    if os.getenv("APP_ENV") == "production" and app.config["SESSION_TYPE"] != "redis":
-        raise RuntimeError("Production sessions must use SESSION_TYPE=redis.")
-    if os.getenv("APP_ENV") == "production" and not app.config["RATELIMIT_STORAGE_URI"].startswith(
-        ("redis://", "rediss://")
-    ):
-        raise RuntimeError("Production rate limits must use a Redis storage URL.")
-    if app.config["SESSION_TYPE"] == "redis":
-        redis_url = os.getenv("REDIS_URL")
-        if not redis_url:
-            raise RuntimeError("REDIS_URL must be configured when SESSION_TYPE=redis.")
-        from redis import Redis
-
-        app.config["SESSION_REDIS"] = Redis.from_url(redis_url)
-    elif app.config["SESSION_TYPE"] == "cachelib" and not app.config.get("SESSION_CACHELIB"):
+    # Existing Render deployments can retain old Redis env vars until Blueprint sync.
+    # Production now always shares sessions and limits through the application DB.
+    if app.config['APP_ENV'] == 'production':
+        app.config['SESSION_TYPE'] = 'mysql'
+        app.config['RATELIMIT_STORAGE_URI'] = 'appsql://'
+        app.config['RATELIMIT_STRATEGY'] = 'fixed-window'
+    if app.config["SESSION_TYPE"] == "cachelib" and not app.config.get("SESSION_CACHELIB"):
         app.config["SESSION_CACHELIB"] = FileSystemCache(
             cache_dir=app.config["SESSION_FILE_DIR"],
             threshold=500,
@@ -111,8 +104,12 @@ def create_app(test_config=None):
     db.init_app(app)
     migration_directory = Path(__file__).resolve().parents[1] / "migrations"
     migrate.init_app(app, db, directory=str(migration_directory))
+    from .database_state import DatabaseSessionInterface  # Register shared SQL limiter storage.
     limiter.init_app(app)
-    Session(app)
+    if app.config['SESSION_TYPE'] == 'mysql':
+        app.session_interface = DatabaseSessionInterface(app)
+    else:
+        Session(app)
 
     CORS(
         app,
@@ -213,7 +210,6 @@ def create_app(test_config=None):
     def readiness():
         from sqlalchemy import text
         from sqlalchemy.exc import SQLAlchemyError
-        from redis.exceptions import RedisError
         from alembic.script import ScriptDirectory
         try:
             db.session.execute(text('SELECT 1'))
@@ -222,8 +218,10 @@ def create_app(test_config=None):
                 actual = set(db.session.execute(text('SELECT version_num FROM alembic_version')).scalars())
                 if actual != expected:
                     return jsonify(status='unavailable'), 503
-                app.config['SESSION_REDIS'].ping()
-        except (SQLAlchemyError, RedisError, OSError):
+                from .models import AppSession, RequestLimit
+                db.session.execute(db.select(AppSession.key_hash).limit(1))
+                db.session.execute(db.select(RequestLimit.key_hash).limit(1))
+        except (SQLAlchemyError, OSError):
             db.session.rollback()
             return jsonify(status='unavailable'), 503
         return jsonify(status='ready')

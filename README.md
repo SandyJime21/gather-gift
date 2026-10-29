@@ -176,7 +176,7 @@ root `Dockerfile` builds the React app and serves it from Flask alongside the
 `/api` endpoints. This keeps the UI and API on one origin, so production login
 cookies and CSRF requests do not depend on cross-origin browser settings.
 `render.yaml` defines the service, health check, generated `SECRET_KEY`, and a
-persistent disk for photos and advertising uploads. The Docker startup command
+persistent disk for photos and advertising uploads. The Render pre-deploy command
 applies Alembic migrations before starting Gunicorn; no Procfile or separate
 Render Static Site is needed.
 
@@ -192,10 +192,9 @@ Render Static Site is needed.
    proxy host/port, not Railway's private hostname. The app accepts `mysql://`
    URLs and selects the PyMySQL driver. Keep the URL private. The database user
    needs permission to create/alter tables and indexes.
-4. The Blueprint creates a Render Key Value (Redis) instance and wires
-   `REDIS_URL` automatically. Production requires Redis for both server
-   sessions and rate limiting.5. Deploy and wait for `/health` to pass. The container runs
-   `flask --app backend db upgrade` automatically before Gunicorn starts. 
+4. Sessions and request limits use Railway MySQL. No Redis service is needed.
+5. Deploy and wait for `/ready` to pass. Render runs
+   `flask --app backend db upgrade` in its pre-deploy stage before Gunicorn starts.
 6. Create the master Developer & support login once from the Render Shell:
 
    ```sh

@@ -1,12 +1,27 @@
 from datetime import datetime, timezone
 
 from werkzeug.security import check_password_hash, generate_password_hash
+from sqlalchemy.dialects.mysql import MEDIUMBLOB
 
 from ..extensions import db
 
 
 def utcnow():
     return datetime.now(timezone.utc)
+
+
+class AppSession(db.Model):
+    __tablename__ = 'app_session'
+    key_hash = db.Column(db.String(64), primary_key=True)
+    data = db.Column(db.LargeBinary().with_variant(MEDIUMBLOB(), 'mysql'), nullable=False)
+    expires_at = db.Column(db.BigInteger, nullable=False, index=True)
+
+
+class RequestLimit(db.Model):
+    __tablename__ = 'request_limit'
+    key_hash = db.Column(db.String(64), primary_key=True)
+    value = db.Column(db.BigInteger, nullable=False)
+    expires_at = db.Column(db.BigInteger, nullable=False, index=True)
 
 
 class User(db.Model):

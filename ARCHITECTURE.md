@@ -6,7 +6,7 @@ Updated October 27, 2026. Current feature scope and acceptance status are in doc
 
 React/Vite/Bootstrap SPA in src; Flask application factory and REST blueprints in backend/app. Development Vite proxies /api and /health. The production Dockerfile builds the SPA, bundles it into the Python image, runs Alembic at startup and serves frontend/API together with Gunicorn. Separate frontend hosting is possible with explicit origin/cookie/CORS configuration.
 
-MySQL is the intended deployment database; SQLAlchemy/Alembic are canonical. schema.sql is a fresh-database snapshot and mysql.sql is optional demo INSERT data, not an upgrade script. Local CacheLib filesystem sessions and production Redis sessions/rate limits are configured through environment values. Uploaded media needs persistent storage. /health is the deployment probe.
+MySQL is the intended deployment database; SQLAlchemy/Alembic are canonical. schema.sql is a fresh-database snapshot and mysql.sql is optional demo INSERT data, not an upgrade script. Local CacheLib filesystem sessions and production MySQL sessions/rate limits are configured through environment values. Uploaded media needs persistent storage. /ready is the deployment probe.
 
 ## Modules
 
@@ -39,4 +39,4 @@ Help is keyword retrieval, not an LLM. Signed-in chat logs/escalated tickets con
 
 ## Release verification
 
-Do not equate source implementation with readiness. See docs/MVP_VALIDATION.json for current frontend results and blocked backend/live checks, docs/MVP_API_ROUTES.md for the declared route catalog, and docs/COPILOT_MVP_REVIEW.md for the independent review prompt. Test migrations on disposable MySQL, not a customer database; verify actual deployment SMTP/Redis/storage/cookies/browser behavior separately.
+Do not equate source implementation with readiness. See docs/MVP_VALIDATION.json for current frontend results and blocked backend/live checks, docs/MVP_API_ROUTES.md for the declared route catalog, and docs/COPILOT_MVP_REVIEW.md for the independent review prompt. Test migrations on disposable MySQL, not a customer database; verify actual deployment SMTP/database/storage/cookies/browser behavior separately.

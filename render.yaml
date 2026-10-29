@@ -1,10 +1,4 @@
 ﻿services:
-  - type: keyvalue
-    name: gather-gift-redis
-    plan: starter
-    ipAllowList: []
-    maxmemoryPolicy: noeviction
-
   - type: web
     name: gather-gift
     runtime: docker
@@ -22,18 +16,15 @@
       - key: APP_ENV
         value: production
       - key: SESSION_TYPE
-        value: redis
+        value: mysql
       - key: UPLOAD_FOLDER
         value: /var/data/uploads
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL
         sync: false
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: gather-gift-redis
-          property: connectionString
+      - key: RATELIMIT_STORAGE_URI
+        value: "appsql://"
       # Same-origin frontend uses RENDER_EXTERNAL_URL automatically.
       - key: SERPAPI_API_KEY
         value: ""

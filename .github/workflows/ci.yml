@@ -28,6 +28,7 @@ jobs:
     env:
       APP_ENV: test
       SESSION_TYPE: cachelib
+      TEST_SESSION_BACKEND: mysql
       DATABASE_URL: mysql+pymysql://root:ci-local-only@127.0.0.1:3306/gather_gift_ci
       SMTP_HOST: ''
       MAIL_FROM: ''
@@ -60,5 +61,9 @@ jobs:
         run: |
           flask --app backend db upgrade
           flask --app backend db check
+      - name: Verify shared sessions and atomic limits on MySQL
+        env:
+          MYSQL_STATE_TEST_URL: ${{ env.DATABASE_URL }}
+        run: python -m pytest backend/tests/test_mysql_state_integration.py -q
       - name: Build the deployment image
         run: docker build -t gather-gift-ci .

@@ -956,3 +956,25 @@ CREATE INDEX ix_letter_art_purchase_payment_intent ON letter_art_purchase (payme
 
 UPDATE alembic_version SET version_num='1bc58d704a92' WHERE alembic_version.version_num = '0a94e27c61bd';
 
+-- Running upgrade 1bc58d704a92 -> 2cd69e815ba3
+
+CREATE TABLE app_session (
+    key_hash VARCHAR(64) NOT NULL, 
+    data MEDIUMBLOB NOT NULL, 
+    expires_at BIGINT NOT NULL, 
+    CONSTRAINT pk_app_session PRIMARY KEY (key_hash)
+);
+
+CREATE INDEX ix_app_session_expires_at ON app_session (expires_at);
+
+CREATE TABLE request_limit (
+    key_hash VARCHAR(64) NOT NULL, 
+    value BIGINT NOT NULL, 
+    expires_at BIGINT NOT NULL, 
+    CONSTRAINT pk_request_limit PRIMARY KEY (key_hash)
+);
+
+CREATE INDEX ix_request_limit_expires_at ON request_limit (expires_at);
+
+UPDATE alembic_version SET version_num='2cd69e815ba3' WHERE alembic_version.version_num = '1bc58d704a92';
+

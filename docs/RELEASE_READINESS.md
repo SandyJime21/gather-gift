@@ -1,5 +1,7 @@
 # MVP release preparation
 
+**Latest update:** Redis has been removed. Migration `2cd69e815ba3` adds shared MySQL sessions and request limits. See [updating an existing Blueprint](DEPLOYMENT.md#update-an-existing-blueprint-without-starting-over). The Redis-removal run passed **180 backend tests** with **2 MySQL-only integration tests skipped locally**; those tests are enabled against disposable MySQL in GitHub Actions after migration. A separate final storage run passed all 6 tests, including legacy Redis settings and migration startup. The updated single-service Blueprint passed Render schema validation. Existing counts below record the earlier release.
+
 October 28, 2026. Prepared for GitHub and a Render staging deployment. No repository was published and no Render resources were created.
 
 ## Fixed
@@ -15,9 +17,9 @@ October 28, 2026. Prepared for GitHub and a Render staging deployment. No reposi
 ## Deployment prepared
 
 - GitHub Actions: frontend tests/build, backend tests, source credential checks, fresh MySQL migration/schema comparison, Docker image build, and read-only repository permissions.
-- Render Blueprint: automatic deploy only after CI passes, migrations in the pre-deploy stage, Redis sessions/rate limits, persistent photo storage, and `/ready` health checking.
+- Render Blueprint: automatic deploy only after CI passes, migrations in the pre-deploy stage, MySQL sessions/rate limits, persistent photo storage, and `/ready` health checking.
 - Docker: Node 22 build, Python 3.12 runtime, Gunicorn workers/threads, bounded request timeout, and container logging. Migration commands are separate from worker startup.
-- Production validates the public HTTPS origin, sufficiently long app secret, external MySQL, Redis, encrypted SMTP when configured, and paired payment keys. Missing SMTP no longer blocks startup/migrations; email-dependent actions stay unavailable until configured. MySQL connections verify TLS certificates/hostnames and use connection health checks.
+- Production validates the public HTTPS origin, sufficiently long app secret, external MySQL, shared database state, encrypted SMTP when configured, and paired payment keys. Missing SMTP no longer blocks startup/migrations; email-dependent actions stay unavailable until configured. MySQL connections verify TLS certificates/hostnames and use connection health checks.
 - Optional payments, ad prices, product search, and affiliate tracking start disabled. Core manual wishlists/preferences still work.
 - Ignore rules and the source packaging script exclude local users, photos, session files, email previews, exports, dependency folders, generated test reports, and environment secrets.
 
@@ -41,6 +43,6 @@ Local generated reports are `docs/release-frontend-results.json` and `docs/relea
 
 Publish the clean source to your GitHub repository, connect the Render Blueprint, and supply managed MySQL and SMTP credentials. Git is unavailable in the current environment, and no repository URL or connected deployment account was provided. The local Docker daemon is unavailable; the prepared CI includes the actual image-build gate.
 
-Before inviting families, verify deployed MySQL TLS/Redis connectivity, photo persistence after redeployment, SMTP inbox delivery/recovery/export, and desktop/phone/iPad flows. If enabling paid features, complete Stripe test-mode checkout/webhook/refund acceptance first. The app is prepared for this deployment review; external integration checks have not been represented as completed.
+Before inviting families, verify deployed MySQL TLS connectivity, photo persistence after redeployment, SMTP inbox delivery/recovery/export, and desktop/phone/iPad flows. If enabling paid features, complete Stripe test-mode checkout/webhook/refund acceptance first. The app is prepared for this deployment review; external integration checks have not been represented as completed.
 
 Follow [the deployment guide](DEPLOYMENT.md) for exact settings, commands, developer-portal setup, and acceptance steps. [Render Blueprint reference](https://render.com/docs/blueprint-spec), [Render deploys and CI](https://render.com/docs/deploys), [Stripe refunds](https://docs.stripe.com/api/refunds/create).
