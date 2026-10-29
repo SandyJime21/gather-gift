@@ -11,16 +11,11 @@ A responsive family gift registry built with React Bootstrap, Flask, MySQL, and 
 
 ## Development setup (Windows PowerShell)
 
-1. Install MySQL 8, Node.js 22.12+, and Python 3.12.
-2. Configure MySQL Server as a Windows service on port 3306 and set a root
-   password.
-3. Run `schema.sql` in MySQL Workbench while connected as the MySQL root
-   administrator. It creates the `family_gifts` database, the local
-   `gift_registry` app login, the full schema, and records the current Alembic
-   revision. Use it only once for a new, empty local development database. Production uses Alembic migrations through Render, as described in the deployment guide. The app login uses the
-   development password in `.env.example`; change both the SQL file and
-   `DATABASE_URL` if you choose a different password.
-4. Set up the backend:
+Local development and Render use the same Railway MySQL database. Do not create a second local database or load demo data for this workflow. Existing local database data is left untouched and is no longer used by this setup.
+
+1. Install Node.js 22.12+ and Python 3.12. A local MySQL server and Redis are not needed.
+2. Keep the shared Railway connection in the root `.env` as `DATABASE_URL`. Local CORS stays `FRONTEND_ORIGIN=http://localhost:5173`; Render uses its public origin. Verified TLS uses `backend/certs/railway-mysql-ca.crt`.
+3. Set up Python dependencies if needed:
 
    ```powershell
    python -m venv .venv
@@ -28,31 +23,20 @@ A responsive family gift registry built with React Bootstrap, Flask, MySQL, and 
    pip install -r backend\requirements.txt
    ```
 
-5. Install frontend packages:
+4. Install frontend packages with `npm.cmd install`.
+5. Start both local processes:
 
    ```powershell
-   npm.cmd install
-   ```
-
-6. Start both the API and React app with one command:
-
-   ```powershell
-   .\.venv\Scripts\Activate.ps1
    npm.cmd run dev:all
    ```
 
-The frontend runs at <http://localhost:5173>; the API runs at <http://localhost:5000>.
-Activate `.venv` again whenever you open a new terminal. To start the apps
-separately, run `python app.py` in one terminal and `npm.cmd start` in another.
-Keep your MySQL server running while using the app; Docker is optional.
-Local development uses file-backed sessions and in-memory rate limits, so Redis
-does not need to be running.
-`schema.sql` is a ready-to-run snapshot of all Alembic migrations for creating a
-fresh database without Docker. For an existing database, continue applying
-future changes with `flask --app backend db upgrade`. After running the schema,
-create the master support account with `python -m flask --app backend create-superuser`.
-`mysql.sql` adds optional fake demo rows only; do not use it for table creation
-or real family data.
+The browser uses <http://localhost:5173>; the local API uses <http://localhost:5000>. The launcher automatically uses `.venv` Python. To start them separately, run `npm.cmd run dev:api` and `npm.cmd start` in separate terminals.
+
+The local API and terminal migration commands read the project `.env` in preference to stale terminal variables. Local startup requires an explicit database URL and will not silently fall back to the old local database. Shared MySQL sessions and request limits are enabled in this computer's private `.env`.
+
+Edits, registrations, wishes, and deletions made locally affect the same database records used by the deployed app. Automated tests still use isolated disposable databases. Uploaded files remain on the server receiving them; sharing MySQL does not by itself synchronize local uploads with Render's disk.
+
+Use `npm.cmd run db:current` to inspect the shared migration revision and `npm.cmd run db:upgrade` to apply reviewed migrations. Do not run the local-only `schema.sql` bootstrap or fake `mysql.sql` demo inserts on this shared database. See [database commands](docs/DATABASE_COMMANDS.md).
 
 ## Family profiles and sharing
 

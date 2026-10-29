@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "vite",
-    "dev": "concurrently --kill-others \"npm start\" \"python app.py\"",
+    "dev": "concurrently --kill-others \"npm start\" \"npm run dev:api\"",
+    "dev:api": "node scripts/development.mjs",
     "dev:all": "npm run dev",
     "build": "vite build",
     "test": "vitest run",
