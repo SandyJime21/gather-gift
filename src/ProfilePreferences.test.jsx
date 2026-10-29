@@ -2,6 +2,19 @@ import {expect,it,vi} from 'vitest';
 import {render,screen,fireEvent} from '@testing-library/react';
 import {GiftGuide,ProfileCompletion,ProfilePreferencesFields,preferencePayload,calculateProfileCompletion,DiscoverGiftProfile} from './ProfilePreferences.jsx';
 
+it('does not request a photo already present, even with an old completion result',()=>{
+ render(<ProfileCompletion profile={{display_name:'Mia',photo_path:'/mia.jpg',is_adult:false,completion:{percent:0,missing:['Photo','Birthday']}}}/>);
+ expect(screen.getByText('Your profile picture is added. Remaining details:')).toBeInTheDocument();
+ expect(screen.getByRole('list',{name:'Missing profile details'})).not.toHaveTextContent('Photo');
+});
+
+it('counts a custom avatar as a profile picture while leaving generic placeholders incomplete',()=>{
+ expect(calculateProfileCompletion({avatar_key:'cat'}).missing).not.toContain('Photo');
+ expect(calculateProfileCompletion({avatar_key:'a12'}).missing).not.toContain('Photo');
+ expect(calculateProfileCompletion({avatar_key:'flower'}).missing).toContain('Photo');
+ expect(calculateProfileCompletion({profile_type:'pet',avatar_key:'paw'}).missing).toContain('Photo');
+});
+
 it('separates adult top and bottom sizes while preserving existing sizes',()=>{
  const onChange=vi.fn();
  const profile={is_adult:true,clothing_sizes:{Shirt:'M',Pants:'8',Dress:'10'}};

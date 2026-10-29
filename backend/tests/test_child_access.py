@@ -1,3 +1,4 @@
+from backend.tests.wishlist_setup import create_test_wishlist
 from backend.tests.test_reservation_privacy import register, mutate
 from backend.app.extensions import db
 from backend.app.models import User, HouseholdMembership
@@ -9,7 +10,7 @@ def child_setup(app):
     register(stranger, 'Stranger', 'childstranger@example.com')
     home = mutate(parent, 'POST', '/api/households', {'name': 'Family', 'profiles': [{'display_name': 'Mia'}, {'display_name': 'Sam'}]}).json['household']
     profiles = parent.get(f"/api/households/{home['id']}").json['profiles']
-    lists = [parent.get(f"/api/profiles/{person['id']}/wishlists").json['wishlists'][0] for person in profiles]
+    lists = [create_test_wishlist(parent, f"/api/profiles/{person['id']}/wishlists") for person in profiles]
     path = f"/api/households/{home['id']}/child-accounts"
     created = mutate(parent, 'POST', path, {'profile_id': profiles[0]['id'], 'wishlist_ids': [lists[0]['id']], 'password': 'child-test-password'})
     assert created.status_code == 201, created.json
@@ -117,7 +118,7 @@ def test_parent_can_hide_child_wishes_from_invited_shoppers(app):
     assert stranger.get(url).json['items']
     assert mutate(parent, 'DELETE', f'/api/items/{item_id}').status_code == 200
 
-def test_child_gets_default_wish_space_without_parent_list_setup(app):
+def test_legacy_child_uses_an_existing_parent_created_list(app):
     parent, child, _, _, profiles, _, path, _ = child_setup(app)
     from backend.app.extensions import db
     from backend.app.models import ChildWishlistAccess
@@ -132,7 +133,7 @@ def test_child_gets_default_wish_space_without_parent_list_setup(app):
     assert added.status_code == 201
     assert child.get('/api/child/me').json['wishlists'][0]['items'][0]['name'] == 'Toy bear'
 
-def test_shared_household_child_mode_needs_no_list_or_login_setup(app):
+def test_shared_household_child_mode_uses_an_existing_parent_created_list(app):
     parent, _, _, _, profiles, _, _, _ = child_setup(app)
     from werkzeug.security import generate_password_hash
     with app.app_context():

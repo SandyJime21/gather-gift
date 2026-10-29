@@ -1,3 +1,4 @@
+from backend.tests.wishlist_setup import create_test_wishlist
 from urllib.parse import urlsplit
 from backend.tests.test_reservation_privacy import register, mutate
 from backend.app.extensions import db
@@ -14,6 +15,7 @@ def joined_family(app):
     profiles=owner.get(f"/api/households/{home['id']}").json['profiles']
     partner=next(p for p in profiles if p['display_name']=='Partner')
     kid=next(p for p in profiles if p['display_name']=='Kid')
+    create_test_wishlist(owner, f"/api/profiles/{kid['id']}/wishlists")
     response=mutate(owner,'POST',f"/api/households/{home['id']}/adult-invitations",{'profile_id':partner['id'],'email':'linked-adult@example.com'})
     assert response.status_code==201,response.json
     token=response.json['email_message']['link'].rsplit('/',1)[-1]
@@ -26,7 +28,7 @@ def joined_family(app):
 def test_adult_owns_wishes_and_creator_only_edits_child_items(app):
     owner,adult,outsider,home,partner,kid,_,_=joined_family(app)
     assert adult.get('/api/auth/me').json['households'][0]['role']=='family_member'
-    own_list=adult.get(f"/api/profiles/{partner['id']}/wishlists").json['wishlists'][0]['id']
+    own_list=create_test_wishlist(adult, f"/api/profiles/{partner['id']}/wishlists")['id']
     own=mutate(adult,'POST',f'/api/wishlists/{own_list}/items',{'name':'Adult gift'})
     assert own.status_code==201,own.json
     iid=own.json['item']['id']
@@ -35,7 +37,7 @@ def test_adult_owns_wishes_and_creator_only_edits_child_items(app):
     assert mutate(owner,'POST','/api/household-session/switch',{'profile_id':partner['id']}).status_code==403
     assert mutate(adult,'PATCH',f'/api/items/{iid}',{'name':'My change'}).status_code==200
     assert mutate(adult,'DELETE',f'/api/items/{iid}').status_code==200
-    child_list=adult.get(f"/api/profiles/{kid['id']}/wishlists").json['wishlists'][0]['id']
+    child_list=create_test_wishlist(adult, f"/api/profiles/{kid['id']}/wishlists")['id']
     child_item=mutate(adult,'POST',f'/api/wishlists/{child_list}/items',{'name':'Kid gift'})
     assert child_item.status_code==201,child_item.json
     cid=child_item.json['item']['id']
@@ -55,8 +57,8 @@ def test_gift_suggestion_requires_recipient_approval_and_own_list(app):
     notices=adult.get('/api/notifications').json['notifications']
     assert any(n.get('suggestion_id')==sid for n in notices)
     assert not any(n.get('suggestion_id') for n in owner.get('/api/notifications').json['notifications'])
-    own_list=adult.get(f"/api/profiles/{partner['id']}/wishlists").json['wishlists'][0]['id']
-    kid_list=owner.get(f"/api/profiles/{kid['id']}/wishlists").json['wishlists'][0]['id']
+    own_list=create_test_wishlist(adult, f"/api/profiles/{partner['id']}/wishlists")['id']
+    kid_list=create_test_wishlist(owner, f"/api/profiles/{kid['id']}/wishlists")['id']
     assert mutate(owner,'POST',f'/api/gift-suggestions/{sid}/respond',{'action':'accept','wishlist_id':own_list}).status_code==404
     assert mutate(adult,'POST',f'/api/gift-suggestions/{sid}/respond',{'action':'accept','wishlist_id':kid_list}).status_code==400
     assert adult.get(f'/api/wishlists/{own_list}/items').json['items']==[]
@@ -117,7 +119,7 @@ def test_owner_can_remove_joined_member_without_taking_over_their_account(app):
     assert linked['can_edit'] is False and linked['can_remove_from_family'] is True
     assert linked['member_email']=='linked-adult@example.com'
     assert mutate(owner,'PATCH',f"/api/profiles/{partner['id']}",{'display_name':'Take over'}).status_code==404
-    own_list=adult.get(f"/api/profiles/{partner['id']}/wishlists").json['wishlists'][0]['id']
+    own_list=create_test_wishlist(adult, f"/api/profiles/{partner['id']}/wishlists")['id']
     item=mutate(adult,'POST',f'/api/wishlists/{own_list}/items',{'name':'Owned adult wish'}).json['item']
     path=f"/api/households/{home['id']}/profiles/{partner['id']}/member"
     assert mutate(adult,'DELETE',path,{}).status_code==403
@@ -139,7 +141,7 @@ def test_authorized_owner_manages_unclaimed_adult_wishes_without_switching_profi
     home=mutate(owner,'POST','/api/households',dict(name='Family',profiles=[dict(display_name='Unclaimed adult',relationship='parent')])).json['household']
     profile=owner.get(f"/api/households/{home['id']}").json['profiles'][0]
     assert owner.get(f"/api/profiles/{profile['id']}").json['profile']['can_remove_wishes'] is True
-    wishlist=owner.get(f"/api/profiles/{profile['id']}/wishlists").json['wishlists'][0]
+    wishlist=create_test_wishlist(owner, f"/api/profiles/{profile['id']}/wishlists")
     added=mutate(owner,'POST',f"/api/wishlists/{wishlist['id']}/items",dict(name='A book'))
     assert added.status_code==201,added.json
     item_id=added.json['item']['id']

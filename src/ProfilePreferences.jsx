@@ -27,9 +27,10 @@ export function ProfilePreferencesFields({profile,onChange,prefix='gift-profile'
 }
 
 const filled=value=>Array.isArray(value)?value.some(filled):value&&typeof value==='object'?Object.values(value).some(filled):value!==null&&value!==undefined&&String(value).trim()!=='';
+const profilePicture=profile=>profile.photo_path || (profile.avatar_key&&!['flower','paw'].includes(profile.avatar_key)?profile.avatar_key:'');
 export function calculateProfileCompletion(profile){
  profile={...(profile.preferences||{}),...profile};
- const fields=[['Photo',profile.photo_path],['Birthday',profile.birthday],['Allergies or none known',profile.allergies],['Current favorites',[...(profile.interests||[]),...(profile.favorite_characters||[]),...(profile.hobbies||[]),...(profile.favorite_snacks||[])]]];
+ const fields=[['Photo',profilePicture(profile)],['Birthday',profile.birthday],['Allergies or none known',profile.allergies],['Current favorites',[...(profile.interests||[]),...(profile.favorite_characters||[]),...(profile.hobbies||[]),...(profile.favorite_snacks||[])]]];
  if(profile.profile_type==='pet')fields.push(['Favorite treats or toys',profile.gift_preferences]);
  else{fields.push(['Clothing size',profile.clothing_sizes],['Shoe size',profile.shoe_sizes],['Favorite colors',profile.favorite_colors]);if(profile.is_adult!==false)fields.push(['Favorite brands',profile.favorite_brands],['Favorite stores',profile.favorite_stores],['Gift preferences',profile.gift_preferences]);}
  const missing=fields.filter(([,value])=>!filled(value)).map(([label])=>label),total=fields.length,completed=total-missing.length;
@@ -42,8 +43,8 @@ export function ProfileCompletionBadge({name,progress}){
 }
 
 export function ProfileCompletion({profile,children,live=false}){
- const progress=live||!profile.completion?calculateProfileCompletion(profile):profile.completion;
- return <section className="profile-completion my-3" aria-label={profile.display_name+' profile completion'}><div className="profile-completion-heading"><div><span className="profile-completion-eyebrow">Make gifting personal</span><strong>{profile.display_name}'s gift profile: {progress.percent}% complete</strong></div><span className="profile-completion-number" aria-hidden="true">{progress.percent}%</span></div><ProgressBar now={progress.percent} aria-label="Gift profile completion" className="my-2"/>{progress.total!=null&&<p className="small profile-completion-count">{progress.completed} of {progress.total} details added</p>}{progress.missing?.length>0?<><p className="visually-hidden">Still to add: {progress.missing.join(', ')}.</p><p className="small mb-2">Add these details next:</p><ul className="profile-completion-checklist" aria-label="Missing profile details">{progress.missing.map(label=><li key={label}>{label}</li>)}</ul></>:<p className="small mb-2">Ready to help people choose a thoughtful gift.</p>}{children}</section>;
+ const progress=live||!profile.completion||(profilePicture(profile)&&profile.completion.missing?.includes('Photo'))?calculateProfileCompletion(profile):profile.completion;
+ return <section className="profile-completion my-3" aria-label={profile.display_name+' profile completion'}><div className="profile-completion-heading"><div><span className="profile-completion-eyebrow">Make gifting personal</span><strong>{profile.display_name}'s gift profile: {progress.percent}% complete</strong></div><span className="profile-completion-number" aria-hidden="true">{progress.percent}%</span></div><ProgressBar now={progress.percent} aria-label="Gift profile completion" className="my-2"/>{progress.total!=null&&<p className="small profile-completion-count">{progress.completed} of {progress.total} details added</p>}{progress.missing?.length>0?<><p className="visually-hidden">Still to add: {progress.missing.join(', ')}.</p><p className="small mb-2">{profilePicture(profile)?'Your profile picture is added. Remaining details:':'Remaining profile details:'}</p><ul className="profile-completion-checklist" aria-label="Missing profile details">{progress.missing.map(label=><li key={label}>{label}</li>)}</ul></>:<p className="small mb-2">Ready to help people choose a thoughtful gift.</p>}{children}</section>;
 }
 
 export function GiftGuide({profile={},compact=false,name=''}){

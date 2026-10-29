@@ -1,4 +1,4 @@
-﻿from backend.tests.test_reservation_privacy import register, mutate
+from backend.tests.test_reservation_privacy import register, mutate
 from backend.app.models import PersonProfile
 from backend.app.extensions import db
 

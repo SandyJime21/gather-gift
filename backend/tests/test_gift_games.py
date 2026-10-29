@@ -1,4 +1,4 @@
-﻿from backend.tests.test_reservation_privacy import register, mutate
+from backend.tests.test_reservation_privacy import register, mutate
 from backend.tests.test_child_access import child_setup
 
 

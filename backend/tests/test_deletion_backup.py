@@ -1,3 +1,4 @@
+from backend.tests.wishlist_setup import create_test_wishlist
 import csv
 import io
 import smtplib
@@ -12,7 +13,7 @@ from backend.app import invitation_mail
 
 def test_csv_contains_managed_family_links_prices_and_saved_items_but_not_another_adults_private_wishes(app):
     owner,adult,_,home,partner,kid,o,a=joined_family(app)
-    kid_list=owner.get(f"/api/profiles/{kid['id']}/wishlists").json['wishlists'][0]['id']
+    kid_list=create_test_wishlist(owner, f"/api/profiles/{kid['id']}/wishlists")['id']
     child_gift=mutate(owner,'POST',f'/api/wishlists/{kid_list}/items',dict(name='Art kit',estimated_price='24.50',currency='USD',product_url='https://example.com/art')).json['item']
     mine=mutate(owner,'POST','/api/personal-wishes',dict(name='My private wish',visibility='private',viewer_ids=[]))
     assert mine.status_code==201

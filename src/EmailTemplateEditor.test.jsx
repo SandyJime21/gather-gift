@@ -1,0 +1,24 @@
+import {fireEvent,render,screen,within} from '@testing-library/react';
+import {expect,it,vi} from 'vitest';
+import EmailTemplateEditor from './EmailTemplateEditor.jsx';
+import {api} from './lib/api.js';
+vi.mock('./lib/api.js',()=>({api:vi.fn()}));
+it('edits HTML and styling, previews separately, and saves the chosen template',async()=>{
+ api.mockResolvedValue({html:'<p>Rendered sample</p>'});
+ const saved=vi.fn();
+ render(<EmailTemplateEditor template={{id:'password-code',label:'Password code',html:'<p>Original</p>'}} onSaved={saved}/>);
+ fireEvent.click(screen.getByRole('button',{name:'Edit HTML blocks'}));
+ const dialog=await screen.findByRole('dialog');
+ fireEvent.click(within(dialog).getByRole('button',{name:'Add HTML block'}));
+ fireEvent.change(within(dialog).getByLabelText('Block HTML'),{target:{value:'<h2>Hello</h2>'}});
+ fireEvent.change(within(dialog).getAllByLabelText('Font')[1],{target:{value:'Georgia'}});
+ fireEvent.click(within(dialog).getByRole('button',{name:'Preview changes'}));
+ expect(await screen.findByTitle('Edited email preview')).toHaveAttribute('sandbox','');
+ expect(api.mock.calls[0][0]).toBe('/support/email-templates/password-code/preview');
+ expect(saved).not.toHaveBeenCalled();
+ fireEvent.click(within(dialog).getByRole('button',{name:'Save template'}));
+ await vi.waitFor(()=>expect(saved).toHaveBeenCalledOnce());
+ const body=JSON.parse(api.mock.calls[1][1].body);
+ expect(body.blocks[0].type).toBe('message');
+ expect(body.blocks[1]).toMatchObject({html:'<h2>Hello</h2>',font:'Georgia'});
+});

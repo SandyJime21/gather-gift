@@ -1,3 +1,4 @@
+from backend.tests.wishlist_setup import create_test_wishlist
 from datetime import date
 from types import SimpleNamespace
 from backend.app.profile_preferences import completion, gift_guide
@@ -17,6 +18,13 @@ def test_completion_counts_only_provided_details_and_supports_none_known():
     assert completion(full)["percent"] == 100
     assert completion(full)["missing"] == []
     assert completion(profile(interests=["  "]))["percent"] == 0
+
+
+def test_uploaded_photos_and_custom_avatars_satisfy_picture_completion():
+    for values in ({'photo_path': 'photo.jpg'}, {'avatar_key': 'cat'}, {'avatar_key': 'a12'}):
+        assert 'Photo' not in completion(profile(**values))['missing']
+    assert 'Photo' in completion(profile(avatar_key='flower'))['missing']
+    assert 'Photo' in completion(profile(profile_type='pet', avatar_key='paw'))['missing']
 
 
 def test_children_and_pets_have_shorter_checklists_and_guides_exclude_private_notes():
@@ -44,7 +52,7 @@ def test_parent_updates_child_gift_guide_and_strangers_cannot_view_it(app):
     assert saved.json["profile"]["allergies"] == "Peanuts"
     assert saved.json["profile"]["favorite_characters"] == ["Minnie Mouse"]
     assert saved.json["profile"]["completion"]["percent"] > 0
-    wishlist = owner.get(path+"/wishlists").json["wishlists"][0]
+    wishlist = create_test_wishlist(owner, path+"/wishlists")
     item = mutate(owner,"POST",f"/api/wishlists/{wishlist['id']}/items",{"name":"Cozy pajamas"}).json["item"]
     assert item["recipient_preferences"]["allergies"] == "Peanuts"
     assert item["recipient_preferences"]["clothing_sizes"] == {"shirt":"5T"}

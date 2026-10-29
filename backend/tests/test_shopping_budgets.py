@@ -1,3 +1,4 @@
+from backend.tests.wishlist_setup import create_test_wishlist
 from backend.app.extensions import db
 from backend.app.models import HouseholdMembership
 from backend.tests.test_reservation_privacy import register, mutate
@@ -11,7 +12,7 @@ def test_budget_filters_search_followed_people_and_exclude_unknown_prices_and_ot
         register(owner, "Parent", f"budget-owner-{index}@example.com")
         home = mutate(owner,"POST","/api/households",{"name":f"Budget family {index}","profiles":[{"display_name":f"Child {index}"}]}).json["household"]
         child = next(p for p in owner.get(f"/api/households/{home['id']}").json["profiles"] if p["display_name"] == f"Child {index}")
-        wishlist = owner.get(f"/api/profiles/{child['id']}/wishlists").json["wishlists"][0]
+        wishlist = create_test_wishlist(owner, f"/api/profiles/{child['id']}/wishlists")
         for name, price, currency, private in [("Small puzzle",10,"USD",False),("At limit",50,"USD",False),("Free printable",0,"USD",False),("Expensive",100,"USD",False),("Unknown",None,"USD",False),("Euro",10,"EUR",False),("Private puzzle",10,"USD",True)]:
             response = mutate(owner,"POST",f"/api/wishlists/{wishlist['id']}/items",{"name":f"{name} {index}","estimated_price":price,"currency":currency,"family_only":private})
             assert response.status_code == 201

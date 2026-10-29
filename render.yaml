@@ -31,6 +31,17 @@
         value: https://gather-gift.onrender.com
       # The client uses same-origin /api requests; no separate API origin is needed.
       - key: SERPAPI_API_KEY
+        sync: false
+      # Optional eBay application keys. Set privately after eBay approval.
+      - key: EBAY_CLIENT_ID
+        sync: false
+      - key: EBAY_CLIENT_SECRET
+        sync: false
+      - key: EBAY_ENVIRONMENT
+        value: production
+      - key: EBAY_MARKETPLACE_ID
+        value: EBAY_US
+      - key: EBAY_AFFILIATE_CAMPAIGN_ID
         value: ""
       - key: STRIPE_SECRET_KEY
         value: ""

@@ -1,4 +1,5 @@
-﻿from backend.tests.test_reservation_privacy import register, mutate
+from backend.tests.wishlist_setup import create_test_wishlist
+from backend.tests.test_reservation_privacy import register, mutate
 from backend.app.extensions import db
 from backend.app.models import FamilyFollow
 
@@ -80,7 +81,7 @@ def test_auto_sharing_includes_future_profiles_but_excludes_private_gifts(app):
     assert len(guest.get(path).json['profiles'])==2
     added=mutate(owner,'POST',path+'/profiles',{'display_name':'New member'}).json['profile']
     assert added['id'] in [p['id'] for p in guest.get(path).json['profiles']]
-    wishlist=owner.get(f"/api/profiles/{added['id']}/wishlists").json['wishlists'][0]
+    wishlist=create_test_wishlist(owner, f"/api/profiles/{added['id']}/wishlists")
     shared=mutate(owner,'POST',f"/api/wishlists/{wishlist['id']}/items",{'name':'Shared book'}).json['item']
     hidden=mutate(owner,'POST',f"/api/wishlists/{wishlist['id']}/items",{'name':'Family-only book','family_only':True}).json['item']
     mutate(owner,'POST','/api/personal-wishes',{'name':'Private jewelry','visibility':'private','viewer_ids':[]})

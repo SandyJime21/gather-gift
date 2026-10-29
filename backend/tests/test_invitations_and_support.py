@@ -1,3 +1,4 @@
+from backend.tests.wishlist_setup import create_test_wishlist
 from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from pathlib import Path
@@ -53,7 +54,7 @@ def test_invitation_grants_only_selected_profiles(app):
         "display_name": "Casey",
     }).get_json()["profile"]
     for profile, gift_name in ((first, "Jordan's book"), (second, "Casey's puzzle")):
-        wishlist = owner.get(f"/api/profiles/{profile['id']}/wishlists").get_json()["wishlists"][0]
+        wishlist = create_test_wishlist(owner, f"/api/profiles/{profile['id']}/wishlists")
         gift = mutate(owner, "POST", f"/api/wishlists/{wishlist['id']}/items", {
             "name": gift_name,
         })

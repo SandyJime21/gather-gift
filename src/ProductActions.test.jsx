@@ -18,7 +18,7 @@ it('adds a Discover product privately to Buying now',async()=>{
 it('only offers controlled profiles when copying to a wishlist',async()=>{
  api.mockImplementation(async path=>path==='/profiles/7/wishlists'?{wishlists:[{id:11,title:'Christmas'}]}:{});
  render(<ProductActions product={product} listOnly profiles={[{id:7,display_name:'Mia',can_edit:true},{id:8,display_name:'Other adult',can_edit:false}]}/>);
- fireEvent.click(screen.getByRole('button',{name:'Add to wishlist'}));
+ fireEvent.click(screen.getByRole('button',{name:'+ Wish'}));
  expect(screen.queryByRole('option',{name:'Other adult'})).not.toBeInTheDocument();
  fireEvent.change(screen.getByLabelText('Whose wishlist?'),{target:{value:'7'}});
  await waitFor(()=>expect(screen.getByLabelText('Wishlist')).toHaveValue('11'));

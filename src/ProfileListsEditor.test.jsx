@@ -5,6 +5,31 @@ import ProfileListsEditor from './ProfileListsEditor.jsx';
 import {api} from './lib/api.js';
 vi.mock('./lib/api.js',()=>({api:vi.fn()}));
 beforeEach(()=>{api.mockReset();});
+it('adds a gift directly to the selected list and resets the form when switching lists',async()=>{
+ let gifts=[];
+ api.mockImplementation(async(path,options)=>{
+  if(path==='/profiles/7')return {profile:{id:7,display_name:'Mia',can_edit:true,can_add:true}};
+  if(path==='/profiles/7/wishlists')return {wishlists:[{id:11,title:'Birthday'},{id:12,title:'Christmas'}]};
+  if(path==='/wishlists/12/items'&&options?.method==='POST'){gifts=[{id:50,...JSON.parse(options.body)}];return {item:gifts[0]};}
+  if(path==='/wishlists/12/items')return {items:gifts};
+  if(path==='/wishlists/11/items')return {items:[]};
+  throw Error(path);
+ });
+ render(<MemoryRouter><ProfileListsEditor profile={{id:7,display_name:'Mia'}}/></MemoryRouter>);
+ fireEvent.click(await screen.findByRole('button',{name:'Add gift'}));
+ fireEvent.change(screen.getByLabelText('Wish name'),{target:{value:'Unfinished birthday idea'}});
+ fireEvent.change(screen.getByLabelText('Wishlist'),{target:{value:'12'}});
+ expect(screen.queryByLabelText('Wish name')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Add gift'}));
+ expect(screen.getByLabelText('Wish name')).toHaveValue('');
+ expect(screen.getByText('Adding to Christmas for Mia')).toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText('Wish name'),{target:{value:'Christmas puzzle'}});
+ fireEvent.click(screen.getByRole('button',{name:'Add to Christmas'}));
+ expect(await screen.findByRole('status')).toHaveTextContent('Gift added to Christmas.');
+ expect(await screen.findByText('Christmas puzzle')).toBeInTheDocument();
+ expect(api).toHaveBeenCalledWith('/wishlists/12/items',expect.objectContaining({method:'POST'}));
+ expect(api).not.toHaveBeenCalledWith('/wishlists/11/items',expect.objectContaining({method:'POST'}));
+});
 it('creates the first list without requiring child mode or a PIN',async()=>{
  api.mockImplementation(async(path,options)=>{
   if(path==='/profiles/7')return {profile:{id:7,can_edit:true,can_add:true}};

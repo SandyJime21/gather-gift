@@ -92,7 +92,10 @@ def account_deletion_preview():
     token=secrets.token_urlsafe(32)
     session['account_deletion_preview']=dict(token=token,signature=signature,expires=time.time()+600)
     from .invitation_mail import mail_configured
-    return jsonify(**preview,confirmation_token=token,backup_email=user.email,backup_available=mail_configured())
+    from .email_preferences import suppressed, preference_link
+    paused=suppressed(user.email)
+    return jsonify(**preview,confirmation_token=token,backup_email=user.email,backup_available=mail_configured() and not paused,
+                   backup_email_paused=paused,backup_preferences_url=preference_link(user.email) if paused else None)
 
 
 @api.delete('/auth/account')

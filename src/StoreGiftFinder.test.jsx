@@ -5,6 +5,20 @@ import { api } from "./lib/api.js";
 vi.mock("./lib/api.js", () => ({ api: vi.fn(), clearCsrfToken: vi.fn(), mediaUrl: (path) => path }));
 afterEach(() => vi.clearAllMocks());
 
+it('saves an entered estimate with the exact original affiliate link',async()=>{
+ const link='https://link.amazon/B03X9bfRK';
+ api.mockResolvedValueOnce({preview:{title:'Gift link',store_name:'Amazon',metadata_unavailable:true}});
+ const save=vi.fn().mockResolvedValue(undefined);
+ render(<StoreGiftFinder gift={{name:''}} onChange={vi.fn()} onSaveProduct={save}/>);
+ fireEvent.change(screen.getByLabelText('Search for a gift'),{target:{value:link}});
+ fireEvent.click(screen.getByRole('button',{name:'Preview link'}));
+ fireEvent.change(await screen.findByLabelText('Gift name'),{target:{value:'Mickey slippers'}});
+ fireEvent.change(screen.getByLabelText('Estimated price'),{target:{value:'19.99'}});
+ fireEvent.change(screen.getByLabelText('Currency'),{target:{value:'CAD'}});
+ fireEvent.click(screen.getByRole('button',{name:'+ Wish'}));
+ await waitFor(()=>expect(save).toHaveBeenCalledWith(expect.objectContaining({name:'Mickey slippers',estimated_price:'19.99',currency:'CAD',product_url:link})));
+});
+
 describe("store gift finder", () => {
   it("fills a gift and store search link without requiring a pasted URL", () => {
     const onChange = vi.fn();
@@ -64,11 +78,11 @@ describe('quick wishlist saving', () => {
     render(<StoreGiftFinder gift={{ name: '' }} onChange={vi.fn()} onSaveProduct={onSaveProduct} />);
     fireEvent.change(screen.getByLabelText('Search for a gift'), { target: { value: 'gifts' } });
     fireEvent.click(screen.getByRole('button', { name: 'Find gifts' }));
-    fireEvent.click((await screen.findAllByRole('button', { name: /Save to list/ }))[0]);
-    expect(await screen.findByRole('button', { name: 'Saved to list' })).toBeDisabled();
+    fireEvent.click((await screen.findAllByRole('button', { name: /\+ Wish/ }))[0]);
+    expect(await screen.findByRole('button', { name: 'Added to list' })).toBeDisabled();
     expect(onSaveProduct).toHaveBeenCalledWith(expect.objectContaining({ name: 'Puzzle', image_url: 'https://store.example.com/puzzle.jpg' }));
-    fireEvent.click(screen.getByRole('button', { name: /Save to list/ }));
-    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Saved to list' })).toHaveLength(2));
+    fireEvent.click(screen.getByRole('button', { name: /\+ Wish/ }));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Added to list' })).toHaveLength(2));
     expect(onSaveProduct).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole('button', { name: 'Use this gift' })).not.toBeInTheDocument();
   });
@@ -78,9 +92,9 @@ describe('quick wishlist saving', () => {
     render(<StoreGiftFinder gift={{ name: '' }} onChange={vi.fn()} onSaveProduct={onSaveProduct} />);
     fireEvent.change(screen.getByLabelText('Search for a gift'), { target: { value: 'puzzle' } });
     fireEvent.click(screen.getByRole('button', { name: 'Find gifts' }));
-    fireEvent.click(await screen.findByRole('button', { name: /Save to list/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /\+ Wish/ }));
     expect(await screen.findByText('Save failed')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Save to list/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /\+ Wish/ })).toBeEnabled();
   });
 });
 
@@ -91,10 +105,10 @@ it('allows undoing an unheart without deleting the original wish', async () => {
   render(<StoreGiftFinder gift={{ name: '' }} onChange={vi.fn()} onSaveProduct={vi.fn()} onRemoveProduct={remove} savedUrls={['https://store.example.com/puzzle']} />);
   fireEvent.change(screen.getByLabelText('Search for a gift'), { target: { value: 'puzzle' } });
   fireEvent.click(screen.getByRole('button', { name: 'Find gifts' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'Unheart / remove' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Remove wish' }));
   expect(screen.getByText(/Removed Puzzle from your list/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
-  expect(screen.getByRole('button', { name: 'Unheart / remove' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: 'Remove wish' })).toHaveAttribute('aria-pressed', 'true');
   expect(remove).not.toHaveBeenCalled();
   expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();
 });
@@ -106,8 +120,8 @@ it('previews a pasted link and saves its details without manual gift inputs', as
   render(<StoreGiftFinder gift={{ name: '' }} onChange={vi.fn()} onSaveProduct={save} />);
   fireEvent.change(screen.getByLabelText('Search for a gift'), { target: { value: 'https://store.example.com/blanket' } });
   fireEvent.click(screen.getByRole('button', { name: 'Preview link' }));
-  fireEvent.click(await screen.findByRole('button', { name: /Save to list/ }));
-  await screen.findByRole('button', { name: 'Saved to list' });
+  fireEvent.click(await screen.findByRole('button', { name: /\+ Wish/ }));
+  await screen.findByRole('button', { name: 'Added to list' });
   expect(api).toHaveBeenCalledWith('/link-preview', expect.objectContaining({ method: 'POST', body: JSON.stringify({ url: 'https://store.example.com/blanket' }) }));
   expect(save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Cozy blanket', product_url: 'https://store.example.com/blanket', image_url: 'https://store.example.com/blanket.jpg' }));
 });

@@ -7,6 +7,23 @@ afterEach(()=>vi.clearAllMocks());
 const controls={web_search:false,product_links:false,manage_pets:false,switch_siblings:false,game_invites:false};
 const initial=()=>({controls:{...controls},available:false,enabled:false,has_parent_pin:false,wishlist_ids:[1,2],wishlists:[{id:1,title:'Everyday wishes'},{id:2,title:'Birthday'}]});
 
+it('shows search approval next to the PIN and saves it without enabling child mode',async()=>{
+ api.mockImplementation(async(path,options)=>options?{status:'saved'}:initial());
+ render(<ChildModeDialog embedded profile={{id:7,display_name:'Mia'}}/>);
+ const toggle=await screen.findByRole('switch',{name:'Search online for gifts'});
+ expect(toggle.closest('details')).toBeNull();
+ expect(toggle).not.toBeChecked();
+ fireEvent.click(toggle);
+ expect(screen.getByText('Yes - allow item search')).toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText('Parent PIN'),{target:{value:'123456'}});
+ fireEvent.change(screen.getByLabelText('Confirm parent PIN'),{target:{value:'123456'}});
+ fireEvent.change(screen.getByLabelText('Your account password'),{target:{value:'parent-password'}});
+ fireEvent.click(screen.getByRole('button',{name:'Save parent PIN'}));
+ await screen.findByText('Parent PIN saved.');
+ expect(api).toHaveBeenCalledWith('/profiles/7/child-controls',{method:'PATCH',body:JSON.stringify({web_search:true})});
+ expect(screen.getByRole('switch',{name:'Enable child mode for Mia'})).not.toBeChecked();
+});
+
 it('sets the parent PIN then saves the child lists and activities from one dialog',async()=>{
  let data=initial();let saved;
  api.mockImplementation(async(path,options)=>{

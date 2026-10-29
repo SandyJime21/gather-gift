@@ -29,6 +29,8 @@ def parent_child_controls(profile_id):
     if child and (not child.is_child or child.parent_user_id != parent.id):
         return error('Only the supervising parent can manage child access.',403)
     lists=Wishlist.query.filter_by(profile_id=profile.id).order_by(Wishlist.is_everyday.desc(),Wishlist.id).all()
+    from .api import empty_legacy_default_list
+    lists=[row for row in lists if not empty_legacy_default_list(row)]
     if request.method == 'PATCH':
         payload = request.get_json(silent=True) or {}
         switches=set(CONTROL_KEYS)|{'enabled'}

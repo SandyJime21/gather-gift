@@ -116,6 +116,13 @@ class HouseholdInvitation(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
 
 
+class EmailSuppression(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), nullable=False, unique=True, index=True)
+    source = db.Column(db.String(30), nullable=False, default='recipient')
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
 class SupportInvitation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(255), nullable=False, index=True)
@@ -590,3 +597,8 @@ class LetterArtPurchase(db.Model):
     paid = db.Column(db.Boolean, nullable=False, default=False)
     revoked = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+class EmailTemplateDesign(db.Model):
+    template_id = db.Column(db.String(60), primary_key=True)
+    blocks = db.Column(db.JSON, nullable=False)

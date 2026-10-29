@@ -18,7 +18,25 @@ def safe_product_url(value):
     return None
 
 
+def search_configured(child_safe=False):
+    from .ebay_search import configured
+    return bool(current_app.config.get('SERPAPI_API_KEY') or (not child_safe and configured()))
+
+
 def search_products(query, child_safe=False):
+    from .ebay_search import configured, search_ebay
+    # Keep the new marketplace integration out of child mode entirely.
+    if not child_safe and configured():
+        try:
+            products=search_ebay(query)
+            if products or not current_app.config.get('SERPAPI_API_KEY'):
+                return products
+        except (OSError,ValueError,TypeError):
+            if not current_app.config.get('SERPAPI_API_KEY'):
+                raise
+            current_app.logger.warning('eBay product search unavailable; using the existing shopping provider.')
+    if not current_app.config.get('SERPAPI_API_KEY'):
+        raise ValueError('Product search is not configured for this account mode.')
     parameters = urlencode({'engine': 'google_shopping', 'q': query, 'gl': 'us', 'hl': 'en',
         **({'safe': 'active'} if child_safe else {}), 'api_key': current_app.config['SERPAPI_API_KEY']})
     with urlopen('https://serpapi.com/search.json?' + parameters, timeout=12) as response:
@@ -32,6 +50,12 @@ def search_products(query, child_safe=False):
         link = safe_product_url(row.get('link')) or safe_product_url(row.get('product_link'))
         title = row.get('title')
         if not link or not isinstance(title, str) or not title.strip():
+            continue
+        # Child search never receives Amazon listings, including listings whose
+        # URL points to Google's product page rather than directly to Amazon.
+        source = str(row.get('source') or '')
+        host = (urlsplit(link).hostname or '').lower()
+        if child_safe and ('amazon' in source.casefold() or host == 'amzn.to' or host.endswith('.amzn.to') or any(part == 'amazon' for part in host.split('.'))):
             continue
         try:
             price = Decimal(str(row.get('extracted_price')))

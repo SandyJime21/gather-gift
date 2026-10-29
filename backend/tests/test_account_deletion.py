@@ -1,3 +1,4 @@
+from backend.tests.wishlist_setup import create_test_wishlist
 import pytest
 from sqlalchemy import text
 from backend.app.extensions import db
@@ -25,12 +26,12 @@ def confirm(client,preview,password='a-long-test-password'):
 
 def test_transfers_family_children_letters_and_permissions_before_deleting_owner(app):
     owner,adult,outsider,home,partner,kid,o,a=joined_family(app)
-    made=mutate(owner,'POST',f"/api/households/{home['id']}/child-accounts",dict(profile_id=kid['id'],password='child-test-password'))
+    made=mutate(owner,'POST',f"/api/households/{home['id']}/child-accounts",dict(profile_id=kid['id'],password='child-test-password',wishlist_ids=[create_test_wishlist(owner, f"/api/profiles/{kid['id']}/wishlists")['id']]))
     assert made.status_code==201,made.json
     child_id=made.json['child']['id']
     child=app.test_client()
     assert mutate(child,'POST','/api/child/login',dict(username=made.json['child']['username'],password='child-test-password')).status_code==200
-    kid_list=owner.get(f"/api/profiles/{kid['id']}/wishlists").json['wishlists'][0]['id']
+    kid_list=create_test_wishlist(owner, f"/api/profiles/{kid['id']}/wishlists")['id']
     item=mutate(owner,'POST',f'/api/wishlists/{kid_list}/items',dict(name='Keep this wish')).json['item']
     letter=mutate(owner,'POST',f"/api/households/{home['id']}/wishlist-letters",dict(title='Santa wishes',sender_name='Santa',send_on='2020-01-01',profile_ids=[kid['id']])).json['letters'][0]
     private=mutate(owner,'POST','/api/personal-wishes',dict(name='Private wish',visibility='private',viewer_ids=[])).json['wish']['item']
@@ -113,8 +114,8 @@ def test_pending_invitation_or_shopper_cannot_inherit_family(app):
 
 def test_no_successor_deletes_owned_child_access_and_unshared_wishes(app):
     owner,adult,_,home,partner,kid,o,a=joined_family(app)
-    child=mutate(owner,'POST',f"/api/households/{home['id']}/child-accounts",dict(profile_id=kid['id'],password='child-test-password')).json['child']
-    kid_list=owner.get(f"/api/profiles/{kid['id']}/wishlists").json['wishlists'][0]['id']
+    child=mutate(owner,'POST',f"/api/households/{home['id']}/child-accounts",dict(profile_id=kid['id'],password='child-test-password',wishlist_ids=[create_test_wishlist(owner, f"/api/profiles/{kid['id']}/wishlists")['id']])).json['child']
+    kid_list=create_test_wishlist(owner, f"/api/profiles/{kid['id']}/wishlists")['id']
     item=mutate(owner,'POST',f'/api/wishlists/{kid_list}/items',dict(name='Family-only wish')).json['item']
     mutate(owner,'DELETE',f"/api/households/{home['id']}/profiles/{partner['id']}/member")
     preview=owner.get('/api/auth/account-deletion').json
@@ -129,7 +130,7 @@ def test_no_successor_deletes_owned_child_access_and_unshared_wishes(app):
 
 def test_account_deletion_cleans_up_private_holds_and_cannot_be_replayed(app):
     owner,adult,_,home,partner,kid,o,a=joined_family(app)
-    kid_list=owner.get(f"/api/profiles/{kid['id']}/wishlists").json['wishlists'][0]['id']
+    kid_list=create_test_wishlist(owner, f"/api/profiles/{kid['id']}/wishlists")['id']
     item=mutate(owner,'POST',f'/api/wishlists/{kid_list}/items',dict(name='Retained gift')).json['item']
     with app.app_context():
         db.session.add(GiftReservation(item_id=item['id'],shopper_id=o['id'],quantity=1,status='reserved'))
@@ -170,8 +171,8 @@ def test_full_family_cascade_removes_pets_saved_gifts_related_records_and_upload
     profiles=owner.get(f"/api/households/{home['id']}").json['profiles']
     kid=next(p for p in profiles if p['display_name']=='Child')
     pet=next(p for p in profiles if p['profile_type']=='pet')
-    child=mutate(owner,'POST',f"/api/households/{home['id']}/child-accounts",dict(profile_id=kid['id'],password='child-test-password')).json['child']
-    pet_list=owner.get(f"/api/profiles/{pet['id']}/wishlists").json['wishlists'][0]['id']
+    child=mutate(owner,'POST',f"/api/households/{home['id']}/child-accounts",dict(profile_id=kid['id'],password='child-test-password',wishlist_ids=[create_test_wishlist(owner, f"/api/profiles/{kid['id']}/wishlists")['id']])).json['child']
+    pet_list=create_test_wishlist(owner, f"/api/profiles/{pet['id']}/wishlists")['id']
     gift=mutate(owner,'POST',f'/api/wishlists/{pet_list}/items',dict(name='Pet toy')).json['item']
     personal=mutate(owner,'POST','/api/personal-wishes',dict(name='Personal wish',visibility='private',viewer_ids=[])).json['wish']['item']
     letter=mutate(owner,'POST',f"/api/households/{home['id']}/wishlist-letters",dict(title='Magic wishes',sender_name='Santa',send_on='2020-01-01',profile_ids=[kid['id']]))

@@ -51,8 +51,10 @@ it.each([false,true])('adds a member with details open and a photo below, retryi
  const photo=screen.getByLabelText('Add profile photo');
  expect(details.compareDocumentPosition(photo)&Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
  fireEvent.change(name,{target:{value:'Mia'}});
+ expect(screen.getByRole('button',{name:'Photo'})).toBeInTheDocument();
  fireEvent.change(photo,{target:{files:[new File(['photo'],'member.png',{type:'image/png'})]}});
  await waitFor(()=>expect(photo).toHaveValue(''));
+ await waitFor(()=>expect(screen.queryByRole('button',{name:'Photo'})).not.toBeInTheDocument());
  fireEvent.click(screen.getByRole('button',{name:'Save changes'}));
  if(retry){await screen.findByText(/Profile saved, but the photo could not be uploaded/);fireEvent.click(screen.getByRole('button',{name:'Save changes'}));}
  await screen.findByText('Saved.');

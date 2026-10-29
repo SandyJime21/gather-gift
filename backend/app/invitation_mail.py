@@ -7,7 +7,7 @@ import re
 import smtplib
 import ssl
 import certifi
-from flask import current_app
+from flask import current_app, g
 
 GETTING_STARTED = (
     ("Make your wish list", "Add things you would love to receive, with links, prices and sizes, under My wishes."),
@@ -35,11 +35,12 @@ def intro_html():
 
 def mail_configured():
     config = current_app.config
-    return bool(config.get('MAIL_OUTBOX_DIR') or (config.get('SMTP_HOST') and config.get('MAIL_FROM')))
+    return bool(getattr(g, 'email_preview_collector', None) is not None or config.get('MAIL_OUTBOX_DIR') or (config.get('SMTP_HOST') and config.get('MAIL_FROM')))
 
 
-def new_message(subject, to):
+def new_message(subject, to, template_id=None):
     message = EmailMessage()
+    message._template_id = template_id
     message['Subject'] = subject
     message['From'] = current_app.config.get('MAIL_FROM') or 'Gather & Gift <noreply@example.com>'
     message['To'] = to
@@ -48,6 +49,15 @@ def new_message(subject, to):
 
 def deliver(message):
     """Send through SMTP, or write an .eml file when MAIL_OUTBOX_DIR is set (preview/testing)."""
+    from .email_preferences import finalize_message, check_delivery
+    from .email_builder import apply_design
+    apply_design(message)
+    finalize_message(message)
+    collector = getattr(g, 'email_preview_collector', None)
+    if collector is not None:
+        collector.append(message)
+        return
+    check_delivery(message)
     outbox = current_app.config.get('MAIL_OUTBOX_DIR')
     if outbox:
         folder = Path(outbox)
@@ -89,7 +99,7 @@ def prepare_invitation(email, token, family_name, registry_type="family"):
     )
     delivery = 'not_configured'
     if mail_configured():
-        message = new_message(subject, email)
+        message = new_message(subject, email, {'company':'company-invite','family_member':'adult-invite'}.get(registry_type,'family-invite'))
         message.set_content(body)
         message.add_alternative(
             f'<html><body style="{BODY_STYLE}">'
@@ -129,7 +139,7 @@ def prepare_family_setup_invitation(email, token, family_name):
     )
     delivery = 'not_configured'
     if mail_configured():
-        message = new_message(subject, email)
+        message = new_message(subject, email, 'family-setup')
         message.set_content(body)
         message.add_alternative(
             f'<html><body style="{BODY_STYLE}">'
@@ -154,7 +164,7 @@ def prepare_family_setup_invitation(email, token, family_name):
 
 
 def send_password_reset(email, link):
-    message = new_message('Reset your Gather & Gift password', email)
+    message = new_message('Reset your Gather & Gift password', email, 'password-reset')
     message.set_content(
         'We received a request to reset your password.\n\n'
         f'Choose a new password: {link}\n\n'
@@ -174,7 +184,7 @@ def send_password_reset(email, link):
 
 
 def send_account_code(email, code, purpose):
-    message = new_message('Your Gather & Gift one-time verification code', email)
+    message = new_message('Your Gather & Gift one-time verification code', email, {'ads_alert_email':'advertising-code','password':'password-code','parent_pin':'parent-pin-code'}.get(purpose,'email-change-code'))
     action = 'confirm your advertising notification email' if purpose == 'ads_alert_email' else 'reset the household password' if purpose == 'password' else 'reset the parent PIN (this code becomes your new PIN after confirmation)' if purpose == 'parent_pin' else 'change the household main email'
     message.set_content(f'Your one-time code to {action} is: {code}\n\nThis code expires in 10 minutes and can only be used once. Do not share this code. If you did not request it, ignore this message.')
     try:
@@ -187,7 +197,7 @@ def send_account_code(email, code, purpose):
 
 def send_change_approval(email, link, purpose):
     action = 'password change' if purpose == 'password_change' else 'family photo change'
-    message = new_message('Approve or cancel your Gather & Gift ' + action, email)
+    message = new_message('Approve or cancel your Gather & Gift ' + action, email, 'password-approval' if purpose=='password_change' else 'photo-approval')
     message.set_content(f'A {action} was requested for your household. Nothing has changed yet.\n\nReview and choose Yes, approve or No, cancel: {link}\n\nThis private approval expires in 30 minutes and works once. If you did not request this, choose cancel or ignore the email. Do not share this link.')
     try:
         deliver(message)
@@ -200,7 +210,7 @@ def send_change_approval(email, link, purpose):
 def send_game_invitation(email, title, inviter, link, names, co_buy=False):
     if not mail_configured():
         return False
-    message = new_message(('Co-buy invitation: ' if co_buy else 'Gift game invitation: ') + title, email)
+    message = new_message(('Co-buy invitation: ' if co_buy else 'Gift game invitation: ') + title, email, 'co-buy-invite' if co_buy else 'game-invite')
     action = 'accept or decline the requested contribution' if co_buy else 'review the game and follow request separately. New here? Create a free account using this email, then choose yes or no for each invitation'
     message.set_content(f'{inviter} invited {", ".join(names)} to {title}. Sign in to {action}.\n\n{link}')
     message.add_alternative(
@@ -223,7 +233,7 @@ def send_co_buy_invitation(email, item_name, inviter, share):
 def send_advertising_notification(email, name, entry, portal_url):
     if not mail_configured():
         return False
-    message = new_message('New advertising request - Gather & Gift', email)
+    message = new_message('New advertising request - Gather & Gift', email, 'advertising-request')
     message.set_content(
         f"Hello {name or 'there'},\n\nA new advertising request is ready in your developer portal.\n\n"
         f"From: {entry.name}\nContact email: {entry.email}\nBusiness: {entry.business_name or 'Not provided'}\n\n"

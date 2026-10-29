@@ -1,3 +1,4 @@
+from backend.tests.wishlist_setup import create_test_wishlist
 from backend.tests.test_reservation_privacy import register, mutate
 
 
@@ -8,7 +9,7 @@ def setup_request(app):
     register(stranger, 'Stranger', 'range-stranger@example.com')
     home = mutate(owner, 'POST', '/api/households', {'name': 'Family', 'profiles': [{'display_name': 'Mia'}]}).json['household']
     profile = owner.get(f"/api/households/{home['id']}").json['profiles'][0]
-    wishlist = owner.get(f"/api/profiles/{profile['id']}/wishlists").json['wishlists'][0]
+    wishlist = create_test_wishlist(owner, f"/api/profiles/{profile['id']}/wishlists")
     mutate(owner, 'PATCH', f"/api/wishlists/{wishlist['id']}", {'share_publicly': True})
     invitation = mutate(owner, 'POST', f"/api/households/{home['id']}/invitations", {'email': 'range-friend@example.com', 'role': 'shopper', 'profile_ids': [profile['id']]}).json['invitation']
     assert mutate(follower, 'POST', '/api/invitations/accept', {'token': invitation['token']}).status_code == 200

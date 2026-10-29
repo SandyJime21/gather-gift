@@ -1,0 +1,33 @@
+import {fireEvent,render,screen,waitFor,within} from '@testing-library/react';
+import {MemoryRouter,Route,Routes} from 'react-router-dom';
+import {afterEach,expect,it,vi} from 'vitest';
+import EmailControl,{EmailPreferencesPage} from './EmailControl.jsx';
+import {api} from './lib/api.js';
+vi.mock('./lib/api.js',()=>({api:vi.fn()}));
+afterEach(()=>vi.clearAllMocks());
+const catalog={templates:[{id:'game-invite',label:'Game invitation',subject:'You are invited',html:'<p>Sample</p>',text:'Sample',attachments:[]}],sample_email:'developer@example.com',mail_configured:true,unsubscribed:false};
+it('previews safely and only sends samples after explicit confirmation',async()=>{
+ api.mockImplementation(async(path,options)=>options?{sent:1,failed:0,previewed:0}:catalog);
+ render(<EmailControl/>);
+ const send=await screen.findByRole('button',{name:'Send all templates to me'});
+ expect(screen.getByTitle('Email template preview')).toHaveAttribute('sandbox','');
+ expect(api).toHaveBeenCalledExactlyOnceWith('/support/email-templates');
+ fireEvent.click(send);
+ const dialog=await screen.findByRole('dialog');
+ expect(dialog).toHaveTextContent('developer@example.com');
+ expect(api).toHaveBeenCalledTimes(1);
+ fireEvent.click(within(dialog).getByRole('button',{name:'Confirm'}));
+ expect(await screen.findByText('1 sample emails sent to developer@example.com.')).toBeInTheDocument();
+ expect(api).toHaveBeenCalledWith('/support/email-templates/send',{method:'POST',body:JSON.stringify({template_ids:['game-invite']})});
+});
+it('does not unsubscribe just by opening an email link and supports restoring delivery',async()=>{
+ let off=false;
+ api.mockImplementation(async(path,options)=>{if(options)off=JSON.parse(options.body).unsubscribed;return {email:'recipient@example.com',unsubscribed:off};});
+ render(<MemoryRouter initialEntries={['/email-preferences/signed-token']}><Routes><Route path="/email-preferences/:token" element={<EmailPreferencesPage/>}/></Routes></MemoryRouter>);
+ fireEvent.click(await screen.findByRole('button',{name:'Unsubscribe from all emails'}));
+ expect(await screen.findByText('All Gather & Gift emails to this address are turned off.')).toBeInTheDocument();
+ expect(api).toHaveBeenCalledWith('/email-preferences/signed-token',{method:'POST',body:JSON.stringify({unsubscribed:true})});
+ fireEvent.click(screen.getByRole('button',{name:'Turn emails back on'}));
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Unsubscribe from all emails'})).toBeInTheDocument());
+ expect(api).toHaveBeenCalledWith('/email-preferences/signed-token',{method:'POST',body:JSON.stringify({unsubscribed:false})});
+});

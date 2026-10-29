@@ -4,6 +4,9 @@ import ipaddress
 import socket
 import ssl
 import certifi
+import json
+import re
+from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit, unquote
 
@@ -42,23 +45,78 @@ class MetadataParser(HTMLParser):
         self.metadata = {}
         self.in_title = False
         self.title = ''
+        self.json_blocks = []
+        self.in_json = False
+        self.json_text = ''
 
     def handle_starttag(self, tag, attrs):
         values = {key.lower(): value for key, value in attrs}
         if tag.lower() == 'meta':
             key = (values.get('property') or values.get('name') or '').lower()
-            if key in {'og:title', 'og:image', 'og:site_name', 'twitter:image', 'twitter:title'} and values.get('content'):
+            if key in {'og:title', 'og:image', 'og:site_name', 'twitter:image', 'twitter:title', 'product:price:amount', 'product:price:currency', 'og:price:amount', 'og:price:currency'} and values.get('content'):
                 self.metadata.setdefault(key, values['content'])
+        if tag.lower() == 'script' and (values.get('type') or '').lower() == 'application/ld+json':
+            self.in_json = True
+            self.json_text = ''
         if tag.lower() == 'title':
             self.in_title = True
 
     def handle_endtag(self, tag):
+        if tag.lower() == 'script' and self.in_json:
+            self.in_json = False
+            try:
+                self.json_blocks.append(json.loads(self.json_text))
+            except (ValueError, RecursionError):
+                pass
         if tag.lower() == 'title':
             self.in_title = False
 
     def handle_data(self, value):
+        if self.in_json:
+            self.json_text += value
         if self.in_title:
             self.title += value[:500]
+
+
+def product_price(parser):
+    """Use only explicit product prices, never unrelated page text or ranges."""
+    def normalize(amount, currency):
+        if not isinstance(currency,str) or not re.fullmatch('[A-Za-z]{3}',currency):
+            return None
+        if not isinstance(amount,(str,int,float)) or isinstance(amount,bool):
+            return None
+        try:
+            price=Decimal(str(amount))
+            if price.is_finite() and 0<=price<=Decimal('99999999.99'):
+                return {'estimated_price':str(price.quantize(Decimal('.01'))),'currency':currency.upper()}
+        except InvalidOperation:
+            pass
+        return None
+    meta=parser.metadata
+    result=normalize(meta.get('product:price:amount') or meta.get('og:price:amount'),meta.get('product:price:currency') or meta.get('og:price:currency'))
+    if result:
+        return result
+    def products(node,depth=0):
+        if depth>12:
+            return
+        if isinstance(node,list):
+            for value in node[:100]:
+                yield from products(value,depth+1)
+        elif isinstance(node,dict):
+            types=node.get('@type',[])
+            if types=='Product' or isinstance(types,list) and 'Product' in types:
+                yield node
+            for key in ('@graph','mainEntity'):
+                yield from products(node.get(key),depth+1)
+    for node in parser.json_blocks:
+        for product in products(node):
+            offers=product.get('offers',[])
+            for offer in (offers if isinstance(offers,list) else [offers])[:50]:
+                if isinstance(offer,dict):
+                    result=normalize(offer.get('price'),offer.get('priceCurrency'))
+                    if result:
+                        return result
+    return {}
 
 
 def basic_link_preview(url, host):
@@ -102,7 +160,11 @@ def preview_link(url):
             title = (metadata.get('og:title') or metadata.get('twitter:title') or parser.title).strip()
             if not title or any(word in title.lower() for word in ('robot or human', 'access denied', 'verify you are human', 'just a moment')):
                 return basic_link_preview(url, host)
+            # Amazon pricing will come from its approved API. Until then adults
+            # can enter an estimated price themselves when saving a link.
+            price = {} if 'amazon' in host.lower().split('.') or host.lower()=='amzn.to' else product_price(parser)
             return {'title': (metadata.get('og:title') or metadata.get('twitter:title') or parser.title).strip()[:200],
+                **price,
                 'image_url': image, 'store_name': (metadata.get('og:site_name') or host.removeprefix('www.'))[:120]}
         except (http.client.HTTPException, OSError):
             return basic_link_preview(url, host)

@@ -1,3 +1,4 @@
+from backend.tests.wishlist_setup import create_test_wishlist
 from backend.tests.test_reservation_privacy import register, mutate
 
 
@@ -16,7 +17,7 @@ def test_private_company_employee_lists_and_selected_invitations(app):
     assert [row['relationship'] for row in profiles] == ['employee', 'manager']
     assert stranger.get(path).status_code == 404
     profile_id = profiles[0]['id']
-    wishlist = company.get(f'/api/profiles/{profile_id}/wishlists').json['wishlists'][0]
+    wishlist = create_test_wishlist(company, f'/api/profiles/{profile_id}/wishlists')
     assert mutate(company, 'POST', f"/api/wishlists/{wishlist['id']}/items", {'name': 'Coffee gift set'}).status_code == 201
     invitation = mutate(company, 'POST', path + '/invitations', {'email': 'companygifter@example.com', 'role': 'shopper', 'profile_ids': [profile_id]})
     assert 'employee gift list' in invitation.json['email_message']['subject']

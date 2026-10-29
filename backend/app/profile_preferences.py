@@ -9,7 +9,9 @@ def filled(value):
 
 def completion(profile):
     interests = (profile.interests or []) + (profile.favorite_characters or []) + (profile.hobbies or []) + (profile.favorite_snacks or [])
-    fields = [("Photo", profile.photo_path), ("Birthday", profile.birthday), ("Allergies or none known", profile.allergies), ("Current favorites", interests)]
+    avatar = getattr(profile, 'avatar_key', None)
+    picture = profile.photo_path or (avatar if avatar not in (None, '', 'flower', 'paw') else None)
+    fields = [("Photo", picture), ("Birthday", profile.birthday), ("Allergies or none known", profile.allergies), ("Current favorites", interests)]
     if profile.profile_type == "pet":
         fields += [("Favorite treats or toys", profile.gift_preferences)]
     else:

@@ -73,7 +73,7 @@ def build_csv(user):
 def send_backup(email,csv_bytes):
     if not mail.mail_configured():
         return None
-    message=mail.new_message('A copy of your Gather & Gift lists and wishes',email)
+    message=mail.new_message('A copy of your Gather & Gift lists and wishes',email,'deletion-backup')
     message.set_content('A copy of your lists and wishes is attached for you to keep. It includes family members, gift names, product links and prices where provided.\n\n'
         'You requested account deletion. This backup was prepared before deleting your account; the app will confirm when deletion completes. '
         'Your personal account records will then be removed. If your family transfers to another adult, its shared profiles and lists remain with that owner.\n\n'

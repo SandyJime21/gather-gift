@@ -49,6 +49,11 @@ def create_app(test_config=None):
         ADS_FOLLOWING_DAILY_RATE_CENTS=os.getenv("ADS_FOLLOWING_DAILY_RATE_CENTS", ""),
         ADS_DISCOVER_DAILY_RATE_CENTS=os.getenv("ADS_DISCOVER_DAILY_RATE_CENTS", ""),
         SERPAPI_API_KEY=os.getenv("SERPAPI_API_KEY", ""),
+        EBAY_CLIENT_ID=os.getenv('EBAY_CLIENT_ID',''),
+        EBAY_CLIENT_SECRET=os.getenv('EBAY_CLIENT_SECRET',''),
+        EBAY_ENVIRONMENT=os.getenv('EBAY_ENVIRONMENT','production'),
+        EBAY_MARKETPLACE_ID=os.getenv('EBAY_MARKETPLACE_ID','EBAY_US'),
+        EBAY_AFFILIATE_CAMPAIGN_ID=os.getenv('EBAY_AFFILIATE_CAMPAIGN_ID',''),
         STORE_AFFILIATE_RULES=os.getenv("STORE_AFFILIATE_RULES", "{}"),
         AMAZON_ASSOCIATE_TAG=os.getenv("AMAZON_ASSOCIATE_TAG", ""),
         SMTP_HOST=os.getenv("SMTP_HOST", ""),
@@ -129,6 +134,8 @@ def create_app(test_config=None):
     from . import child_controls  # Parent-owned optional child permissions.
     from . import batch_wishlists  # Create matching lists for several family members.
     from . import wishlist_price_requests
+    from . import email_preferences
+    from . import email_control
     app.register_blueprint(api, url_prefix="/api")
     from .advertising import ad_api
     app.register_blueprint(ad_api, url_prefix="/api")

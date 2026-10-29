@@ -1,0 +1,2 @@
+import {runPython} from './python.mjs';
+runPython(['-c', "from dotenv import load_dotenv; load_dotenv('.env',override=True); from backend import create_app; from backend.app.ebay_search import configured,search_ebay; app=create_app(); ctx=app.app_context(); ctx.push(); assert configured(), 'Add EBAY_CLIENT_ID and EBAY_CLIENT_SECRET to .env first'; products=search_ebay('building blocks'); print('eBay connection successful: '+str(len(products))+' products returned. No keys or tokens displayed.')"]);

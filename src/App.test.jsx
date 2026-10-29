@@ -670,7 +670,7 @@ describe('personal wishes with a selected family audience', () => {
     await screen.findByLabelText('Search for a gift');
     fireEvent.change(screen.getByLabelText('Search for a gift'), { target: { value: 'Jewelry' } });
     fireEvent.click(screen.getByRole('button', { name: 'Find gifts' }));
-    fireEvent.click(await screen.findByRole('button', { name: /Save to list/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /\+ Wish/ }));
     await waitFor(() => expect(saved).toBeDefined());
     expect(saved.name).toBe('Jewelry');
     expect(saved.visibility).toBe('followers');
@@ -871,7 +871,7 @@ it('sends an adult family gift as a suggestion instead of adding it directly',as
  expect(screen.getByText('They will approve this suggestion before it is added.')).toBeInTheDocument();
  fireEvent.change(screen.getByLabelText('Search for a gift'),{target:{value:'puzzle'}});
  fireEvent.click(screen.getByRole('button',{name:'Find gifts'}));
- fireEvent.click(await screen.findByRole('button',{name:'Save to list'}));
+ fireEvent.click(await screen.findByRole('button',{name:'+ Wish'}));
  expect(await screen.findByText('Suggestion sent.')).toBeInTheDocument();
  expect(suggestion.name).toBe('Suggested puzzle');
  expect(fetch.mock.calls.some(([url,options])=>url==='/api/wishlists/12/items' && options.method==='POST')).toBe(false);

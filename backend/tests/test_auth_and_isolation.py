@@ -105,7 +105,7 @@ def test_household_occasion_creation_adds_occasion_wishlist(client):
     })
     assert response.status_code == 201, response.get_json()
     wishlists = client.get(f"/api/profiles/{profile['id']}/wishlists").get_json()["wishlists"]
-    assert [row["title"] for row in wishlists] == ["Everyday Wants & Needs", "Mochi's Gotcha Day wishes"]
+    assert [row["title"] for row in wishlists] == ["Mochi's Gotcha Day wishes"]
 
 
 def test_profile_managers_cannot_edit_profiles(client):

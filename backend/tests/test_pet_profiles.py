@@ -1,3 +1,4 @@
+from backend.tests.wishlist_setup import create_test_wishlist
 from backend.app.extensions import db
 from backend.app.models import HouseholdMemberProfileAccess, HouseholdMembership, GiftReservation
 from backend.tests.test_child_access import child_setup
@@ -13,7 +14,7 @@ def add_pet(parent, household_id):
     )
     assert response.status_code == 201, response.get_json()
     profile = response.get_json()["profile"]
-    wishlist = parent.get(f"/api/profiles/{profile['id']}/wishlists").get_json()["wishlists"][0]
+    wishlist = create_test_wishlist(parent, f"/api/profiles/{profile['id']}/wishlists")
     return profile, wishlist
 
 

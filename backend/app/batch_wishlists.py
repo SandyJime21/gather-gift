@@ -14,6 +14,12 @@ def create_family_lists():
         return error('Only family accounts can create these lists.', 403)
     payload = request.get_json(silent=True) or {}
     title, ids = payload.get('title'), payload.get('profile_ids')
+    source_id = payload.get('source_wishlist_id')
+    if source_id is not None:
+        source = db.session.get(Wishlist, source_id) if type(source_id) is int else None
+        if not source or profile_access(parent, source.profile_id, write=True) is None:
+            return error('Choose a source list you manage.', 403)
+        title = source.title
     allow = payload.get('allow_child_items', False)
     if (not isinstance(title, str) or not 1 <= len(title.strip()) <= 160
             or not isinstance(ids, list) or not 1 <= len(ids) <= 50
@@ -36,6 +42,13 @@ def create_family_lists():
         children[profile.id] = child
     created = []
     for profile in profiles:
+        if source_id is not None:
+            existing = next((row for row in Wishlist.query.filter_by(profile_id=profile.id).with_for_update().all()
+                             if row.title.strip().casefold() == title.strip().casefold()), None)
+            if existing:
+                created.append(dict(id=existing.id, profile_id=profile.id, title=existing.title,
+                                    name=profile.display_name, already_exists=True))
+                continue
         wishlist = Wishlist(profile_id=profile.id, title=title.strip(), share_publicly=False)
         db.session.add(wishlist)
         db.session.flush()

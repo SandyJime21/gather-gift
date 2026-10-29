@@ -1,0 +1,31 @@
+import {fireEvent,render,screen,within} from '@testing-library/react';
+import {afterEach,expect,it,vi} from 'vitest';
+import WishlistActions from './WishlistActions.jsx';
+import {api} from './lib/api.js';
+vi.mock('./lib/api.js',()=>({api:vi.fn()}));
+afterEach(()=>vi.clearAllMocks());
+it('saves inline sharing and keeps privacy unchanged when saving fails',async()=>{
+ const changed=vi.fn();api.mockRejectedValueOnce(new Error('Sharing could not be saved.')).mockResolvedValueOnce({});
+ render(<WishlistActions list={{id:12,title:'Christmas',share_publicly:false}} onRenamed={vi.fn()} onDeleted={vi.fn()} onSharingChanged={changed}/>);
+ const toggle=screen.getByRole('switch',{name:'Share this list with approved followers'});
+ fireEvent.click(toggle);
+ expect(await screen.findByText('Sharing could not be saved.')).toBeInTheDocument();
+ expect(toggle).not.toBeChecked();expect(changed).not.toHaveBeenCalled();
+ fireEvent.click(toggle);
+ await vi.waitFor(()=>expect(changed).toHaveBeenCalledWith(true));
+ expect(api).toHaveBeenCalledWith('/wishlists/12',{method:'PATCH',body:JSON.stringify({share_publicly:true})});
+});
+it('requires confirmation before deleting and reports failures without removing the list',async()=>{
+ const removed=vi.fn();api.mockRejectedValueOnce(new Error('Could not delete list.')).mockResolvedValueOnce({});
+ render(<WishlistActions list={{id:12,title:'Christmas'}} onRenamed={vi.fn()} onDeleted={removed}/>);
+ fireEvent.click(screen.getByRole('button',{name:'Delete Christmas'}));
+ let dialog=await screen.findByRole('dialog');
+ expect(within(dialog).getByRole('button',{name:'Cancel'})).toHaveFocus();
+ expect(api).not.toHaveBeenCalled();
+ fireEvent.click(within(dialog).getByRole('button',{name:'Yes, delete list'}));
+ expect(await screen.findByText('Could not delete list.')).toBeInTheDocument();
+ expect(removed).not.toHaveBeenCalled();
+ fireEvent.click(within(dialog).getByRole('button',{name:'Yes, delete list'}));
+ await vi.waitFor(()=>expect(removed).toHaveBeenCalledWith(12));
+ expect(api).toHaveBeenCalledWith('/wishlists/12',{method:'DELETE'});
+});

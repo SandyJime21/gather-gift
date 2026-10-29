@@ -26,6 +26,8 @@ def send_all_samples(to):
     mail.send_game_invitation(to, 'Family Secret Santa', 'Alex Rivera', origin + '/games', ['Taylor', 'Sam'])
     mail.send_co_buy_invitation(to, 'Lego Castle', 'Alex Rivera', '50.00')
     mail.send_advertising_notification(to, 'Sandy', entry, origin + '/support')
+    from .deletion_backup import send_backup
+    send_backup(to, b'Person,Gift,Link,Price\r\nTaylor,Sample puzzle,https://example.com/puzzle,20.00\r\n')
 
 
 def write_html_previews(folder):

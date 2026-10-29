@@ -5,6 +5,20 @@ from backend.tests.test_reservation_privacy import register
 from backend.app.product_search import search_products
 
 
+def test_child_search_excludes_amazon_even_when_google_hides_store_url(app, monkeypatch):
+    app.config['SERPAPI_API_KEY']='test-key'
+    rows=[
+        {'title':'Amazon toy','source':'Amazon.com','product_link':'https://www.google.com/shopping/product/1'},
+        {'title':'Direct toy','source':'Marketplace','link':'https://www.amazon.com/dp/123'},
+        {'title':'Short link','link':'https://amzn.to/example'},
+        {'title':'Other toy','source':'Other store','link':'https://store.example/toy'},
+    ]
+    monkeypatch.setattr('backend.app.product_search.urlopen',lambda *args,**kwargs:BytesIO(json.dumps({'shopping_results':rows}).encode()))
+    with app.app_context():
+        assert len(search_products('toys'))==4
+        assert [p['name'] for p in search_products('toys',child_safe=True)]==['Other toy']
+
+
 def test_discovery_requires_login_and_has_honest_unconfigured_fallback(app):
     client = app.test_client()
     assert client.get('/api/gift-discovery?q=flowers').status_code == 401

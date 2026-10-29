@@ -18,7 +18,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from ..extensions import db, limiter
 from ..invitation_mail import prepare_invitation, prepare_family_setup_invitation, send_password_reset, send_account_code, send_change_approval
-from ..product_search import search_products, safe_product_url
+from ..product_search import search_products, safe_product_url, search_configured
 from ..link_preview import preview_link
 from ..affiliate_links import shopping_link
 from ..models import (
@@ -433,7 +433,6 @@ def create_household_profile(household_id, membership, payload):
     db.session.add(profile)
     db.session.flush()
     db.session.add(HouseholdProfileAccess(household_id=household_id, profile_id=profile.id, relationship=relationship))
-    db.session.add(Wishlist(profile_id=profile.id, title="Everyday Wants & Needs", is_everyday=True))
     return profile
 
 
@@ -1392,6 +1391,26 @@ def update_profile(profile_id):
     }})
 
 
+@api.post('/profiles/<int:profile_id>/favorite-stores')
+@authenticated
+def add_favorite_store(profile_id):
+    profile = PersonProfile.query.filter_by(id=profile_id).with_for_update().first()
+    if request.current_user.is_child or request.current_user.is_support or not profile or profile_access(request.current_user, profile_id, write=True) is None:
+        return error('You can only update favorite stores for profiles you manage.', 403)
+    name = (request.get_json(silent=True) or {}).get('store')
+    if not isinstance(name, str) or not 1 <= len(name.strip()) <= 120:
+        return error('Choose a store name within 120 characters.', 400)
+    stores = [value.strip() for value in (profile.favorite_stores or [])
+              if isinstance(value, str) and value.strip() and value.strip().casefold() != 'none']
+    if not any(value.casefold() == name.strip().casefold() for value in stores):
+        if len(stores) >= 100:
+            return error('You already have 100 favorite stores. Edit the profile to remove one first.', 400)
+        stores.append(name.strip())
+    profile.favorite_stores = stores
+    db.session.commit()
+    return jsonify(favorite_stores=stores, completion=profile_completion(profile))
+
+
 @api.get("/profiles/<int:profile_id>/occasions")
 @authenticated
 def list_occasions(profile_id):
@@ -1462,6 +1481,11 @@ def create_occasion(household_id):
     }}), 201
 
 
+def empty_legacy_default_list(row):
+    return (row.is_everyday and row.title == 'Everyday Wants & Needs'
+            and not WishlistItemWishlist.query.filter_by(wishlist_id=row.id).first())
+
+
 @api.get("/profiles/<int:profile_id>/wishlists")
 @authenticated
 def list_wishlists(profile_id):
@@ -1469,9 +1493,20 @@ def list_wishlists(profile_id):
     if profile is None:
         return error("Profile not found.", 404)
     rows = Wishlist.query.filter_by(profile_id=profile_id).order_by(Wishlist.is_everyday.desc(), Wishlist.id).all()
+    rows = [row for row in rows if not empty_legacy_default_list(row)]
+    family_view = bool(rows and list_family_access(rows[0], request.current_user))
+    populated = set()
+    if not family_view:
+        for item, list_id in db.session.query(WishlistItem, WishlistItemWishlist.wishlist_id).join(
+                WishlistItemWishlist, WishlistItemWishlist.item_id == WishlistItem.id).filter(
+                WishlistItemWishlist.wishlist_id.in_([row.id for row in rows]),
+                WishlistItem.profile_id == profile_id).all():
+            if item_audience_allowed(item, request.current_user):
+                populated.add(list_id)
     return jsonify({"wishlists": [{
         "id": row.id, "title": row.title, "is_everyday": row.is_everyday, "occasion_id": row.occasion_id, "share_publicly": list_is_shared(row),
-    } for row in rows if list_is_shared(row) or list_family_access(row, request.current_user)]})
+    } for row in rows if (family_view or row.id in populated)
+        and (list_is_shared(row) or family_view)]})
 
 
 @api.post("/profiles/<int:profile_id>/wishlists")
@@ -3252,7 +3287,7 @@ def gift_recommendations():
     candidates.sort(key=lambda i:(sum(w in i['name'].lower() for w in words),i.get('priority') or 0),reverse=True)
     products=[]
     query=(seeds[0].category or seeds[0].name)[:120] if seeds else 'gift ideas books games crafts'
-    if current_app.config.get('SERPAPI_API_KEY'):
+    if search_configured():
         cache=current_app.extensions.setdefault('gift_recommendations_cache',{})
         key=(user.id,query)
         cached=cache.get(key)
@@ -3276,7 +3311,7 @@ def gift_discovery():
     query = request.args.get("q", "").strip()
     if not query or len(query) > 200:
         return error("Enter a gift search up to 200 characters.", 400)
-    if not current_app.config.get("SERPAPI_API_KEY"):
+    if not search_configured():
         return jsonify({"enabled": False, "products": [], "message": "Live product results are not available yet. Browse Google or a store below, or save your idea with an automatic shopping link."})
     try:
         products = search_products(query)
@@ -3395,7 +3430,7 @@ def personal_wishlist():
         "family_profiles": [{"id": profile.id, "display_name": profile.display_name,
             "preferences": gift_guide(profile),
             "completion": profile_completion(profile) if profile_access(user, profile.id, write=True) is not None else None,
-            "profile_type": profile.profile_type, "photo_path": profile.photo_path, "avatar_key": profile.avatar_key,
+            "profile_type": profile.profile_type, "is_adult": profile.is_adult, "photo_path": profile.photo_path, "avatar_key": profile.avatar_key,
             "household_id": home.id, "household_name": home.name,
             "can_edit": profile_access(user, profile.id, write=True) is not None,
             "can_add": profile_dict(profile, user)['can_add'],
@@ -3552,7 +3587,7 @@ def create_child_account(household_id):
         return error("Choose a child password between 10 and 1024 characters.", 400)
     lists = payload.get('wishlist_ids')
     if lists is None or lists == []:
-        lists = [default_child_wishlist(profile.id).id]
+        return error('Create a wishlist in Lists & gifts, then choose it for child mode.', 400)
     if not child_lists_allowed(profile.id, lists):
         return error("Choose existing wishlists for this child only.", 400)
     username = 'wish-' + secrets.token_hex(5)
@@ -3610,8 +3645,6 @@ def manage_child_account(household_id, child_id):
             return error("Choose a password between 10 and 1024 characters.", 400)
         child.set_password(password)
     if 'wishlist_ids' in payload:
-        if payload['wishlist_ids'] == []:
-            payload['wishlist_ids'] = [default_child_wishlist(profile.id).id]
         if not child_lists_allowed(profile.id, payload['wishlist_ids']):
             return error("Choose wishlists belonging to this child.", 400)
         ChildWishlistAccess.query.filter_by(user_id=child.id).delete()
@@ -3641,12 +3674,8 @@ def child_login():
 
 
 def default_child_wishlist(profile_id):
-    wishlist = Wishlist.query.filter_by(profile_id=profile_id, is_everyday=True).first()
-    if wishlist is None:
-        wishlist = Wishlist(profile_id=profile_id, title='My wishes', is_everyday=True)
-        db.session.add(wishlist)
-        db.session.flush()
-    return wishlist
+    return next((row for row in Wishlist.query.filter_by(profile_id=profile_id).order_by(
+        Wishlist.is_everyday.desc(), Wishlist.id).all() if not empty_legacy_default_list(row)), None)
 
 
 def approved_child_lists(child):
@@ -3662,9 +3691,10 @@ def approved_child_lists(child):
     explicit_lists=((parent.notification_preferences or {}).get('child_access',{}).get(str(child.id),{})).get('lists_configured',False)
     if not lists and not explicit_lists:
         wishlist = default_child_wishlist(profile.id)
-        db.session.add(ChildWishlistAccess(user_id=child.id, wishlist_id=wishlist.id))
-        db.session.commit()
-        lists = [wishlist]
+        if wishlist is not None:
+            db.session.add(ChildWishlistAccess(user_id=child.id, wishlist_id=wishlist.id))
+            db.session.commit()
+            lists = [wishlist]
     from ..wishlist_letters import active_letters
     from ..models import WishlistLetter
     letter_ids = [row.wishlist_id for row in active_letters(profile.id)]
@@ -3688,7 +3718,7 @@ def child_gift_search():
         return error('Child account required.', 403)
     if not query or len(query) > 120:
         return error('What gift would you like to find?', 400)
-    if not current_app.config.get('SERPAPI_API_KEY'):
+    if not search_configured(child_safe=True):
         return error('Gift search is unavailable. You can still add ideas or a product link.', 503)
     try:
         products = search_products(query, child_safe=True)
@@ -4202,6 +4232,9 @@ def switch_household_profile():
     if not user.parent_pin_hash:
         return error('Set a parent PIN before entering child mode.', 400)
     if child is None and profile.account_user_id is None:
+        wishlist = default_child_wishlist(profile.id)
+        if wishlist is None:
+            return error('Create a wishlist in Lists & gifts and approve it in Child access & PIN first.', 400)
         username = 'wish-' + secrets.token_hex(5)
         child = User(name=profile.display_name, email=username + '@child.accounts.invalid',
             is_child=True, child_username=username, parent_user_id=user.id)
@@ -4209,7 +4242,6 @@ def switch_household_profile():
         db.session.add(child)
         db.session.flush()
         profile.account_user_id = child.id
-        wishlist = default_child_wishlist(profile.id)
         db.session.add(ChildWishlistAccess(user_id=child.id, wishlist_id=wishlist.id))
         db.session.commit()
     if not child or not child.is_child or child.parent_user_id != user.id or not child.child_enabled:
@@ -4784,6 +4816,42 @@ def public_wish_preview():
     rows = PersonalWish.query.filter_by(visibility='public').order_by(PersonalWish.id.desc()).limit(100).all()
     return jsonify(wishes=[{'name':row.item.name,'image_url':row.item.image_path,'occasion':row.occasion,
         'product_url':shopping_link(row.item.product_url),'recipient':db.session.get(User,row.owner_id).name} for row in rows])
+
+
+@api.delete('/wishlists/<int:list_id>')
+@authenticated
+def delete_wishlist(list_id):
+    row = Wishlist.query.filter_by(id=list_id).with_for_update().first()
+    if not row or profile_access(request.current_user, row.profile_id, write=True) is None:
+        return error('Wishlist not found or edit permission denied.', 404)
+    from ..models import WishlistLetter
+    links = WishlistItemWishlist.query.filter_by(wishlist_id=row.id).all()
+    for link in links:
+        item = db.session.get(WishlistItem, link.item_id)
+        elsewhere = WishlistItemWishlist.query.filter(
+            WishlistItemWishlist.item_id == link.item_id, WishlistItemWishlist.wishlist_id != row.id).first()
+        if item and item.profile_id == row.profile_id and not elsewhere:
+            SavedGift.query.filter_by(item_id=item.id).delete()
+            reservation_ids = db.session.query(GiftReservation.id).filter_by(item_id=item.id)
+            CoBuyInvitation.query.filter(CoBuyInvitation.reservation_id.in_(reservation_ids)).delete(synchronize_session=False)
+            db.session.delete(item)
+        else:
+            db.session.delete(link)
+    affected = [access.user_id for access in ChildWishlistAccess.query.filter_by(wishlist_id=row.id).all()]
+    ChildWishlistAccess.query.filter_by(wishlist_id=row.id).delete()
+    for child_id in affected:
+        child = db.session.get(User, child_id)
+        parent = db.session.get(User, child.parent_user_id) if child and child.is_child else None
+        if parent:
+            preferences = dict(parent.notification_preferences or {})
+            access = dict(preferences.get('child_access', {}))
+            access[str(child.id)] = {**access.get(str(child.id), {}), 'lists_configured': True}
+            parent.notification_preferences = {**preferences, 'child_access': access}
+            child.session_version += 1
+    WishlistLetter.query.filter_by(wishlist_id=row.id).delete()
+    db.session.delete(row)
+    db.session.commit()
+    return jsonify(status='deleted')
 
 
 @api.patch('/wishlists/<int:list_id>')

@@ -1,12 +1,26 @@
+from backend.tests.wishlist_setup import create_test_wishlist
 import socket
 import pytest
-from backend.app.link_preview import preview_link, public_target
+from backend.app.link_preview import preview_link, public_target, MetadataParser, product_price
 from backend.tests.test_reservation_privacy import register, mutate
 
 
 def fake_dns(host, *args, **kwargs):
     address = host if host in {'127.0.0.1', '10.0.0.1', '169.254.169.254', '224.0.0.1'} else '93.184.216.34'
     return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (address, 443))]
+
+
+@pytest.mark.parametrize('html,expected',[
+    ('<meta property="product:price:amount" content="24.95"><meta property="product:price:currency" content="usd">',{'estimated_price':'24.95','currency':'USD'}),
+    ('<script type="application/ld+json">{"@graph":[{"@type":"Product","offers":{"price":"0","priceCurrency":"GBP"}}]}</script>',{'estimated_price':'0.00','currency':'GBP'}),
+    ('<script type="application/ld+json">{"@type":"Product","offers":{"lowPrice":"4","highPrice":"99","priceCurrency":"USD"}}</script>',{}),
+    ('<meta property="product:price:amount" content="NaN"><meta property="product:price:currency" content="USD">',{}),
+    ('<script type="application/ld+json">{"@type":"Organization","price":"55","priceCurrency":"USD"}</script>',{}),
+    ('<script type="application/ld+json">broken</script><p>$99</p>',{}),
+])
+def test_only_explicit_product_prices_are_used(html,expected):
+    parser=MetadataParser();parser.feed(html)
+    assert product_price(parser)==expected
 
 
 def test_link_preview_reads_image_and_title_without_leaking_network_access(app, monkeypatch):
@@ -67,7 +81,7 @@ def test_shopper_preview_excludes_private_plans_notes_and_purchases(app):
     path = f"/api/households/{home['id']}"
     profile = owner.get(path).json['profiles'][0]
     mutate(owner, 'PATCH', f"/api/profiles/{profile['id']}", {'parent_notes': 'Private parent note'})
-    wishlist = owner.get(f"/api/profiles/{profile['id']}/wishlists").json['wishlists'][0]
+    wishlist = create_test_wishlist(owner, f"/api/profiles/{profile['id']}/wishlists")
     mutate(owner, 'POST', f"/api/wishlists/{wishlist['id']}/items", {'name': 'Visible wish'})
     mutate(owner, 'POST', '/api/private-gifts', {'name': 'Secret surprise', 'recipient': 'Mia'})
     response = owner.get(path + '/shopper-preview')

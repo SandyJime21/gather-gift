@@ -23,6 +23,8 @@ def matches(item, row):
 def price_request_notifications(user):
     rows = []
     for saved in (user.notification_preferences or {}).get('wishlist_price_requests', []):
+        if saved.get('wishlist_id') and db.session.get(Wishlist, saved['wishlist_id']) is None:
+            continue
         profile = profile_access(user, saved['profile_id'], write=True)
         sender = db.session.get(User, saved['sender_id'])
         if not profile or not sender or profile_access(sender, profile.id) is None:

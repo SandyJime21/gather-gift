@@ -14,7 +14,8 @@
     "db:migrate": "node scripts/database.mjs migrate",
     "db:current": "node scripts/database.mjs current",
     "db:check": "node scripts/database.mjs check",
-    "db:heads": "node scripts/database.mjs heads"
+    "db:heads": "node scripts/database.mjs heads",
+    "ebay:check": "node scripts/check-ebay.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
