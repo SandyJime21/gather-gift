@@ -143,6 +143,8 @@ describe("family gift planning flow", () => {
 
     expect(await screen.findByRole("heading", { name: "My wishes", level:1 }, {timeout:3000})).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Household name"), { target: { value: "The Example Family" } });
+    expect(screen.queryByLabelText("Which family member are you?")).not.toBeInTheDocument();
+    expect(screen.getByText("Taylor Example (you)")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Family member 1 name"), { target: { value: "Taylor" } });
     fireEvent.change(screen.getByLabelText("Family member 1 relationship"), { target: { value: "dad" } });
     fireEvent.click(screen.getByRole("button", { name: "+ Add another person or pet" }));
@@ -151,6 +153,7 @@ describe("family gift planning flow", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create household" }));
     expect(await screen.findByRole("link", { name: /the example family/i })).toBeInTheDocument();
     const createRequest = fetch.mock.calls.find(([url, options]) => url === "/api/households" && options?.method === "POST");
+    expect(JSON.parse(createRequest[1].body).self_profile_index).toBe("new");
     expect(JSON.parse(createRequest[1].body).profiles).toEqual([
       { display_name: "Taylor", profile_type: "person", birthday: "", relationship: "dad" },
       { display_name: "Mochi", profile_type: "pet", birthday: "" },
