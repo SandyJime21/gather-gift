@@ -14,6 +14,16 @@ it('can complete the profile with manually entered stores and foods without any 
  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow','100');
  expect(api).not.toHaveBeenCalled();
 });
+it('counts an explicit None as answered and allows clearing it',()=>{
+ render(<ManualProfile/>);
+ fireEvent.click(screen.getByLabelText('None for favorite snacks'));
+ fireEvent.click(screen.getByLabelText('None for favorite stores'));
+ expect(screen.getByLabelText('Favorite stores')).toHaveValue('None');
+ expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow','100');
+ fireEvent.click(screen.getByLabelText('None for favorite stores'));
+ expect(screen.getByLabelText('Favorite stores')).toHaveValue('');
+ expect(Number(screen.getByRole('progressbar').getAttribute('aria-valuenow'))).toBeLessThan(100);
+});
 it('adds an online result without replacing manually entered favorites or adding duplicates',async()=>{
  api.mockResolvedValue({results:[{label:'Target',url:'https://en.wikipedia.org/wiki/Target_Corporation'}]});
  const changed=vi.fn();render(<PreferenceEntry field="favorite_stores" label="Favorite stores" id="stores" values={['My shop']} onChange={changed}/>);
@@ -24,7 +34,12 @@ it('adds an online result without replacing manually entered favorites or adding
  expect(changed).not.toHaveBeenCalled();fireEvent.click(add);
  expect(changed).toHaveBeenLastCalledWith(['My shop','Target']);
  expect(screen.getByLabelText('Favorite stores')).toHaveValue('My shop, Target');
+ expect(screen.queryByLabelText('Search favorite stores')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Search online for favorite stores'}));
  expect(screen.getByRole('button',{name:'Added: Target'})).toBeDisabled();
+ fireEvent.click(screen.getByRole('button',{name:'Close suggestions for favorite stores'}));
+ expect(screen.queryByRole('button',{name:'Added: Target'})).not.toBeInTheDocument();
+ expect(screen.getByLabelText('Favorite stores')).toHaveValue('My shop, Target');
  expect(api).toHaveBeenCalledWith('/preference-search?field=favorite_stores&q=Target');
 });
 it('keeps manual entry available after an online search fails',async()=>{

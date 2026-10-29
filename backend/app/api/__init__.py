@@ -242,6 +242,8 @@ def profile_access(user, profile_id, write=False):
     if not write and pet_family_access(user, profile):
         return profile
     linked = db.session.get(User, profile.account_user_id) if profile.account_user_id else None
+    if not write and linked and not linked.is_child and profile.is_adult and not HouseholdProfileAccess.query.filter_by(profile_id=profile.id).first() and FamilyFollow.query.filter_by(follower_id=user.id, followed_id=linked.id).first():
+        return profile
     if write and linked and not linked.is_child and linked.id != user.id:
         return None
     if write and not profile.is_adult:
@@ -2009,6 +2011,7 @@ def list_notifications():
         Notification.created_at.desc()
     ).limit(100).all()
     from ..adult_family import suggestion_notifications
+    from ..wishlist_price_requests import price_request_notifications
     notifications = suggestion_notifications(request.current_user) + availability_notifications(request.current_user) + pending_follow_notifications(request.current_user) + pending_co_buy_notifications(request.current_user) + pending_game_notifications(request.current_user) + [{
         "id": row.id,
         "hold_expired": row.message.startswith("Your hold expired:"),
@@ -2022,6 +2025,7 @@ def list_notifications():
         "read": row.read_at is not None,
         "created_at": row.created_at.isoformat(),
     } for row in rows]
+    notifications = price_request_notifications(request.current_user) + notifications
     profile_reminders = []
     editable_profiles = PersonProfile.query.join(HouseholdProfileAccess).join(HouseholdMembership,
         HouseholdMembership.household_id == HouseholdProfileAccess.household_id).filter(HouseholdMembership.user_id == request.current_user.id).distinct().all()
@@ -2038,6 +2042,10 @@ def list_notifications():
                 "url": "/profiles/"+str(profile.id)+"?edit=1", "read": False,
                 "created_at": profile.updated_at.isoformat(), "household_name": "Gift profile", "completion": progress})
     preferences = request.current_user.notification_preferences or {}
+    read_ids = set(preferences.get('read_notification_ids', []))
+    for row in notifications + profile_reminders:
+        if str(row['id']) in read_ids:
+            row['read'] = True
     profile_reminders.sort(key=lambda row: (not row["is_you"], row["profile_name"].casefold()))
     dismissed_ids = set(preferences.get("dismissed_notification_ids", []))
     dismissed_profiles = preferences.get("dismissed_profile_reminders", [])
@@ -2045,7 +2053,7 @@ def list_notifications():
     def enabled(row):
         if str(row["id"]) in dismissed_ids:
             return False
-        if row.get("profile_completion"):
+        if row.get("profile_completion") or row.get("price_request"):
             return True
         kind = "suggestions" if row.get("suggestion_id") else "holds" if row.get("hold_expired") else "availability" if row.get("availability_alert_id") else "follow_requests" if row.get("invitation_id") else "co_buy" if row.get("co_buy_invitation_id") else "games" if row.get("game_id") else "purchases"
         return preferences.get(kind, True)
@@ -3346,12 +3354,23 @@ def unheart_gift(item_id):
     return jsonify({"is_hearted": False})
 
 
+def set_private_buying(row, buying):
+    user = db.session.get(User, row.user_id)
+    preferences = dict(user.notification_preferences or {})
+    ids = set(preferences.get('buying_private_gift_ids', []))
+    ids.discard(row.id)
+    if buying and row.status == 'planned':
+        ids.add(row.id)
+    preferences['buying_private_gift_ids'] = sorted(ids)
+    user.notification_preferences = preferences
+
+
 def private_gift_dict(row):
     return {"id": row.id, "name": row.name, "recipient": row.recipient,
         "household_name": row.household_name, "occasion": row.occasion,
         "store_name": row.store_name, "product_url": shopping_link(row.product_url), "original_product_url": row.product_url, "image_url": row.image_url,
         "estimated_price": str(row.estimated_price) if row.estimated_price is not None else None,
-        "currency": row.currency, "status": row.status}
+        "currency": row.currency, "status": row.status, "buying_now": row.status == "planned" and row.id in (db.session.get(User, row.user_id).notification_preferences or {}).get("buying_private_gift_ids", [])}
 
 
 @api.get("/wishlist")
@@ -3389,6 +3408,8 @@ def personal_wishlist():
 @authenticated
 def create_private_gift():
     payload = request.get_json(silent=True) or {}
+    if 'buying_now' in payload and type(payload['buying_now']) is not bool:
+        return error('Choose a valid buying state.', 400)
     values = {}
     for field, limit in (("name", 200), ("recipient", 120), ("household_name", 160), ("occasion", 160), ("store_name", 120)):
         value = payload.get(field, "")
@@ -3411,6 +3432,9 @@ def create_private_gift():
         return error("Currency must contain three letters.", 400)
     row = PrivateGift(user_id=request.current_user.id, estimated_price=price, currency=currency.upper(), **values)
     db.session.add(row)
+    db.session.flush()
+    if payload.get('buying_now'):
+        set_private_buying(row, True)
     db.session.commit()
     return jsonify({"gift": private_gift_dict(row)}), 201
 
@@ -3421,10 +3445,15 @@ def update_private_gift(gift_id):
     row = PrivateGift.query.filter_by(id=gift_id, user_id=request.current_user.id).first()
     if row is None:
         return error("Gift not found.", 404)
-    status = (request.get_json(silent=True) or {}).get("status")
+    payload = request.get_json(silent=True) or {}
+    if 'buying_now' in payload and type(payload['buying_now']) is not bool:
+        return error('Choose a valid buying state.', 400)
+    status = payload.get('status', row.status if 'buying_now' in payload else None)
     if status not in {"planned", "purchased"}:
         return error("Choose planned or purchased.", 400)
     row.status = status
+    if 'buying_now' in payload or status == 'purchased':
+        set_private_buying(row, payload.get('buying_now', False))
     db.session.commit()
     return jsonify({"gift": private_gift_dict(row)})
 
@@ -3435,6 +3464,7 @@ def delete_private_gift(gift_id):
     row = PrivateGift.query.filter_by(id=gift_id, user_id=request.current_user.id).first()
     if row is None:
         return error("Gift not found.", 404)
+    set_private_buying(row, False)
     db.session.delete(row)
     db.session.commit()
     return jsonify({"status": "removed"})
@@ -4638,7 +4668,9 @@ def search_adult_families():
     rows = db.session.query(Household, User).join(User, Household.owner_id == User.id).filter(
         Household.registry_type == 'family', User.is_child.is_(False), User.is_support.is_(False),
         User.id != request.current_user.id,
-        or_(db.and_(*[func.lower(User.name).contains(word, autoescape=True) for word in words]), Household.id.in_(adult_homes))
+        or_(db.and_(*[func.lower(User.name).contains(word, autoescape=True) for word in words]),
+            db.and_(*[func.lower(Household.name).contains(word, autoescape=True) for word in words]),
+            Household.id.in_(adult_homes))
     ).order_by(Household.name).limit(20).all()
     session['invite_lookup_homes'] = [home.id for home, _ in rows]
     return jsonify(matches=[{'user_id': user.id, 'name': home.name,

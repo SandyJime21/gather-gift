@@ -48,6 +48,6 @@ it('selects participants across followed families and formats a money budget',as
  fireEvent.click(screen.getByLabelText('Followed family'));
  expect(screen.getByLabelText('Blair')).toBeChecked();
  expect(screen.getByText('2 selected')).toBeInTheDocument();
- fireEvent.click(screen.getByRole('button',{name:'Send game invitations'}));
+ fireEvent.click(screen.getByRole('button',{name:'Create game'}));
  expect(await screen.findByRole('button',{name:'All games'})).toBeInTheDocument();
 });

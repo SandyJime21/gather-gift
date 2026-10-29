@@ -1,6 +1,7 @@
 """Household gift exchanges, private draws, and versioned party turns."""
 import copy
 import secrets
+import time
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from flask import Blueprint, jsonify, request, session, current_app
@@ -123,7 +124,9 @@ def game_dict(game, user):
         'budget':format(game.budget, '.2f') if game.budget is not None else None,'event_date':game.event_date.isoformat() if game.event_date else None,
         'status':game.status,'version':game.version,'participants':people(game),'can_host':organizer(game,user), 'your_profile_id':active,
         'join_profiles':[pid for pid in managed_participants(game,user) if pid in state.get('pending',[])], 'leave_profiles':managed_participants(game,user), 'assignment_profiles':assignment_profiles(game,user),'gifts':gifts,'contributed_profile_ids':[gift['contributor_id'] for gift in state.get('gifts',[])],'order':state.get('order',[]),'current_player_id':state.get('current_player_id'),
-        'max_steals':state.get('max_steals',2),'last_stolen_id':state.get('last_stolen_id')}
+        'max_steals':state.get('max_steals',2),'last_stolen_id':state.get('last_stolen_id'),
+        'pending_email_invitations':sum(row['status']=='pending' and row['expires_at']>time.time() for row in state.get('email_invites',[])),
+        'email_invitations':[{'email':row['email'],'status':row['status']} for row in state.get('email_invites',[]) if row['status']=='pending' and row['expires_at']>time.time()] if organizer(game,user) else []}
 
 
 def locked_game(game_id):
@@ -172,7 +175,7 @@ def create_game():
     if not home or home.registry_type!='family' or not member or (member.role not in ('owner','admin') and not member.is_family_member):
         return error('Household owner or administrator required.',403)
     participants=payload.get('participants')
-    if not isinstance(participants,list) or not 2<=len(participants)<=50 or any(type(pid) is not int for pid in participants) or len(set(participants))!=len(participants):
+    if not isinstance(participants,list) or not (1 if payload.get('allow_draft') is True else 2)<=len(participants)<=50 or any(type(pid) is not int for pid in participants) or len(set(participants))!=len(participants):
         return error('Choose 2 to 50 different family members.',400)
     allowed={p['id'] for home in eligible_families(request.current_user) for p in home['profiles']}
     if not set(participants)<=allowed:
@@ -246,7 +249,7 @@ def start_game(game_id):
     if not organizer(game,request.current_user):return error('Only the organizer can start this game.',403)
     if game.status!='waiting':return error('This game has already started.',409)
     state=copy.deepcopy(game.state)
-    if state.get('pending'):
+    if state.get('pending') or any(row['status']=='pending' and row['expires_at']>time.time() for row in state.get('email_invites',[])):
         return error('Wait for invited participants to join or leave before starting.',409)
     if any(db.session.get(PersonProfile,pid) is None for pid in state['participants']):
         return error('A participant is no longer available. Create a new game.',409)

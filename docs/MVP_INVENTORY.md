@@ -195,6 +195,8 @@ Not implemented/certified: retailer checkout/purchase verification, co-buy money
 
 ## Copilot review files
 
+Local update: Gift games can be saved with one starting player, then invite adults by name/family search or email. Email links support signup/sign-in and preserve the invitation. Joining the game and allowing the organizer to follow the recipient are separate required Yes/No choices. Follow approval shares only the recipient's own adult profile, never their children or pets. Links expire after seven days and cannot be reused after responding or withdrawal. Only hosts can see pending email addresses and withdraw invitations; pending invitations block starting. Failed email delivery is reported and does not block the game. SMTP must be configured for delivery; SMS is not implemented.
+
 - [Readiness report](MVP_READINESS.md): verdict, audit fixes and remaining acceptance gates.
 - [Copilot prompt](COPILOT_MVP_REVIEW.md): independent review and acceptance checklist.
 - [API route catalog](MVP_API_ROUTES.md): declared routes, source handlers and guards.

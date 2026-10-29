@@ -126,7 +126,7 @@ def test_name_search_matches_only_adults_never_children(app):
     with app.app_context():
         PersonProfile.query.filter_by(display_name='Jordan Adultname').one().is_adult=True
         db.session.commit()
-    for query in ['Morgan','Parker','Morgan Parker','Jordan','Adultname','Jordan Adultname']:
+    for query in ['Morgan','Parker','Morgan Parker','Jordan','Adultname','Jordan Adultname','Parker family']:
         response=mutate(guest,'POST','/api/families/name-search',{'query':query})
         assert response.status_code==200
         assert response.json['matches'][0]['name']=='Parker family'

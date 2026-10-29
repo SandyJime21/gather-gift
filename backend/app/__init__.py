@@ -127,12 +127,15 @@ def create_app(test_config=None):
     from . import letter_art  # Register design catalog and family unlocks.
     from . import preference_search  # Optional public suggestions for manual favorites.
     from . import child_controls  # Parent-owned optional child permissions.
+    from . import batch_wishlists  # Create matching lists for several family members.
+    from . import wishlist_price_requests
     app.register_blueprint(api, url_prefix="/api")
     from .advertising import ad_api
     app.register_blueprint(ad_api, url_prefix="/api")
     from .money import money_api
     app.register_blueprint(money_api, url_prefix="/api")
     from .gift_games import game_api
+    from . import game_email_invites
     app.register_blueprint(game_api, url_prefix="/api")
     from .sample_emails import register as register_sample_emails
     register_sample_emails(app)

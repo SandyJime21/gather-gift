@@ -671,6 +671,13 @@ button.household-card > .card-body { height:100%; }
 .header-shopping-bag .badge { position:absolute; top:-.15rem; right:-.3rem; font-size:.6rem; }
 .gifting-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.75rem; }
 .gifting-toolbar .past-gifts-button { font-size:.8rem; padding:.45rem .7rem; }
+.gifting-toolbar .nav { gap:.3rem; }
+.gifting-toolbar .nav-link { display:flex; align-items:center; justify-content:center; gap:.35rem; }
+@media(max-width:575px) {
+ .gifting-toolbar .nav { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; }
+ .gifting-toolbar .nav-link { min-width:0; padding:.65rem .35rem; font-size:.8rem; }
+ .gifting-toolbar .nav-link svg { width:19px; height:19px; flex-shrink:0; }
+}
 #my-gifting > .container { margin-top:0!important; }
 
 .notification-preference { padding:.85rem 0; border-bottom:1px solid var(--gift-line); max-width:600px; }
@@ -892,7 +899,7 @@ html[data-bs-theme=dark] .member-profile-tile :is(.member-relationship,.member-m
 .wishlist-budget-suggestions { border:1px solid var(--gift-line,#e7e1ee); border-radius:12px; padding:1rem; background:var(--bs-tertiary-bg,#faf8fb); }
 .wishlist-budget-suggestions li { margin:.35rem 0; }
 
-.help-assistant { position: fixed; right: 1rem; bottom: 1rem; z-index: 1050; display: flex; flex-direction: column; align-items: flex-end; gap: .5rem; }
+.help-assistant { position: fixed; left: max(1rem, env(safe-area-inset-left)); right: auto; bottom: 1rem; z-index: 1050; display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; }
 .help-assistant-toggle { border-radius: 999px; padding: .6rem 1.1rem; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 .help-assistant-panel { width: min(22rem, calc(100vw - 2rem)); max-height: 70vh; overflow: auto; background: var(--bs-body-bg, #fff); color: var(--bs-body-color, #212529); border: 1px solid rgba(0,0,0,.15); border-radius: 1rem; padding: 1rem; box-shadow: 0 8px 28px rgba(0,0,0,.3); }
 .help-assistant-panel header { display: flex; justify-content: space-between; align-items: center; }
@@ -937,11 +944,14 @@ html[data-bs-theme=dark] .member-profile-tile :is(.member-relationship,.member-m
 .portal-side-menu { position: sticky; top: 1rem; gap: .25rem; }
 .portal-side-menu .nav-link { text-align: left; }
 
-.member-profile-grid .member-profile-tile.btn { position:relative; padding-top:3.2rem; }
-.settings-profile-progress { position:absolute; top:.65rem; right:.65rem; display:flex; flex-direction:column; align-items:flex-end; gap:.15rem; width:68px; line-height:1.1; }
+.member-profile-grid .member-profile-tile.btn { position:relative; min-height:210px; padding-top:1rem; }
+.member-profile-grid .family-pets-row .member-profile-tile.btn { min-height:190px; }
+.settings-profile-progress { position:static; align-self:flex-end; flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end; gap:.15rem; width:68px; line-height:1.1; }
 .settings-profile-progress > span { font-size:.9rem; font-weight:700; }
 .settings-profile-progress progress { width:100%; height:6px; accent-color:var(--bs-success); }
 .settings-profile-progress small { font-size:.6rem; font-weight:400; }
+.profile-complete-check { color:var(--bs-success,#198754); }
+.modal-header > .settings-profile-progress { margin-left:auto; margin-right:.75rem; align-self:center; }
 
 .completion-field-missing { border-inline-start:3px solid var(--bs-success); background:rgba(var(--bs-success-rgb),.06); padding:.75rem; border-radius:8px; scroll-margin-top:1rem; }
 .completion-next-fields { padding:.85rem; border:1px solid var(--gift-line,#e7e1ee); border-radius:10px; }
@@ -981,6 +991,11 @@ html[data-bs-theme=dark] .member-profile-tile :is(.member-relationship,.member-m
 .letter-art-default { font-size:2.5rem; display:block; }
 .letter-art-choice small { display:block; }
 .letter-art-banner { display:block; width:100%; max-height:200px; object-fit:contain; margin-bottom:1rem; border-radius:12px; }
+
+.gift-profile-field-grid.adult-size-fields { grid-template-columns:repeat(3,minmax(0,1fr)); }
+@media (max-width:375px) {
+ .gift-profile-field-grid.adult-size-fields { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.6rem; }
+}
 
 /* Keep phone/tablet layouts inside the viewport, including the fixed menu. */
 @media (max-width:1024px) {

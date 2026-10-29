@@ -395,7 +395,7 @@ describe("family photo visibility", () => {
     fireEvent.change(await screen.findByLabelText("Family photo"), { target: { files: [new File(["photo"], "family.jpg", { type: "image/jpeg" })] } });
     expect(await screen.findByRole("img", { name: "Photo Family family photo" })).toHaveAttribute("src", "/api/uploads/family.jpg");
     fireEvent.click(screen.getByRole("link", { name: /All households/ }));
-    expect(await screen.findByRole("img", { name: "Photo Family family photo" })).toHaveAttribute("src", "/api/uploads/family.jpg");
+    expect(await screen.findByRole("img", { name: "Photo Family profile photo" })).toHaveAttribute("src", "/api/uploads/family.jpg");
   });
 });
 
@@ -427,7 +427,7 @@ describe("invitation account flow", () => {
     expect(accepted).toBe(true);
     fireEvent.click(screen.getByRole("link", { name: /All households/ }));
     expect(await screen.findByRole("button", { name: /Invited Family/ })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /All families/ }));
+    fireEvent.click(screen.getByRole("button", { name: /People & families/ }));
     const familyDialog=await screen.findByRole("dialog");
     fireEvent.click(within(familyDialog).getByRole("button", {name:/Invited Family/}));
     expect(within(familyDialog).getByText("Invited Family", {selector:".modal-title"})).toBeInTheDocument();
@@ -449,9 +449,9 @@ describe("wishlist hub", () => {
     });
     render(<App />);
     fireEvent.click(await screen.findByRole('button', { name: 'Heart gift' }));
-    fireEvent.click(screen.getByRole('link', {name:'My gifting'}));
-    await screen.findByRole('heading', {name:'My gifting',level:1});
-    fireEvent.click(await screen.findByText(/^Saved for later/));
+    fireEvent.click(screen.getByRole('link', {name:'Saved items'}));
+    await screen.findByRole('heading', {name:'Saved items',level:1});
+    fireEvent.click(await screen.findByRole('button',{name:/^Saved items/}));
     await waitFor(() => expect(within(document.getElementById('my-gifting')).getByRole('button', { name: 'Unheart' })).toBeInTheDocument());
     expect(screen.queryByRole('tablist', {name:'Wishlist areas'})).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Shop my circles' })).not.toBeInTheDocument();
@@ -464,6 +464,35 @@ describe("wishlist hub", () => {
 });
 
 describe("settings and notification bell", () => {
+  it('shows people discovery and only displays Requests when pending requests exist',async()=>{
+    registered=true;window.history.replaceState({},'','/');
+    let pending=false;
+    const fallback=fetch.getMockImplementation();
+    fetch.mockImplementation(async(url,options={})=>url==='/api/invitations'?jsonResponse({sent:pending?[{id:1,status:'pending'}]:[],received:[]}):fallback(url,options));
+    render(<App/>);
+    fireEvent.click(await screen.findByRole('link',{name:'Following'}));
+    expect(await screen.findByRole('link',{name:'People & families'})).toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'Find people to follow'})).toBeInTheDocument();
+    expect(screen.queryByRole('link',{name:/Requests/})).not.toBeInTheDocument();
+    pending=true;window.dispatchEvent(new Event('invitations-updated'));
+    expect(await screen.findByRole('link',{name:'Requests (1)'})).toBeInTheDocument();
+    pending=false;window.dispatchEvent(new Event('invitations-updated'));
+    await waitFor(()=>expect(screen.queryByRole('link',{name:/Requests/})).not.toBeInTheDocument());
+  });
+  it('opens the actual PIN form from the profile switching link',async()=>{
+    registered=true;
+    window.history.replaceState({},'', '/');
+    const fallback=fetch.getMockImplementation();
+    fetch.mockImplementation(async(url,options={})=>url==='/api/household-session'?jsonResponse({profiles:[],has_parent_pin:false}):fallback(url,options));
+    render(<App/>);
+    fireEvent.click(await screen.findByRole('button',{name:'Family account menu'}));
+    fireEvent.click(await screen.findByText('Switch profile'));
+    fireEvent.click(await screen.findByRole('link',{name:'Set / change parent PIN in Settings'}));
+    expect(await screen.findByLabelText('Parent PIN')).toBeVisible();
+    expect(screen.getByLabelText('Your account password')).toBeVisible();
+    expect(screen.getByRole('button',{name:'Save parent PIN'})).toBeVisible();
+    expect(window.location.search).toContain('section=parent-pin');
+  });
   it("opens the notification feed separately from settings and clears the unread badge", async () => {
     registered = true;
     window.history.replaceState({}, '', '/');
@@ -693,6 +722,26 @@ describe('family profile settings', () => {
 });
 
 describe('gifting status rows', () => {
+  it('switches between Buying now and Saved items in the header bag',async()=>{
+    registered=true;window.history.replaceState({},'','/');
+    let buying=true;
+    const fallback=fetch.getMockImplementation();
+    fetch.mockImplementation(async(url,options={})=>{
+      if(url==='/api/wishlist')return jsonResponse({hearted:[],private_gifts:[{id:17,name:'Private puzzle',recipient:'Taylor',status:'planned',buying_now:buying}],family_profiles:[]});
+      if(url==='/api/private-gifts/17'){buying=JSON.parse(options.body).buying_now;return jsonResponse({});}
+      return fallback(url,options);
+    });
+    render(<App/>);
+    fireEvent.click(await screen.findByRole('button',{name:'Buying now, 1 gifts'}));
+    const dialog=await screen.findByRole('dialog');
+    expect(await within(dialog).findByRole('heading',{name:'Private puzzle'})).toBeInTheDocument();
+    expect(within(dialog).getByRole('button',{name:/^Saved items/})).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button',{name:'Save for later'}));
+    await waitFor(()=>expect(within(dialog).queryByRole('heading',{name:'Private puzzle'})).not.toBeInTheDocument());
+    fireEvent.click(within(dialog).getByRole('button',{name:/^Saved items/}));
+    expect(await within(dialog).findByRole('heading',{name:'Private puzzle'})).toBeInTheDocument();
+    expect(buying).toBe(false);
+  });
   it('shows buying, later and purchased without repeating held or purchased cards', async () => {
     registered = true;
     window.history.replaceState({}, '', '/wishlist?section=plans');
@@ -706,14 +755,14 @@ describe('gifting status rows', () => {
       return fallback(url, options);
     });
     render(<App/>);
-    expect(await screen.findByText(/^Saved for later/)).toBeInTheDocument();
+    expect(await screen.findByRole('button',{name:/^Saved items/})).toBeInTheDocument();
     expect(screen.queryByRole('heading',{name:'Purchased'})).not.toBeInTheDocument();
-    expect(await screen.findByText('Buying now',{selector:'.nav-link'})).toBeInTheDocument();
+    fireEvent.click(await screen.findByText('Buying now',{selector:'.nav-link'}));
     expect(await screen.findByRole('heading',{name:'Held puzzle'})).toBeInTheDocument();
     expect(screen.getAllByRole('heading',{name:'Held puzzle'})).toHaveLength(1);
     expect(screen.queryByText('Purchased book')).not.toBeInTheDocument();
     expect(screen.queryByText('Completed private idea')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText(/^Saved for later/));
+    fireEvent.click(screen.getByRole('button',{name:/^Saved items/}));
     expect(await screen.findByText('Later idea')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:'Past gifts'}));
     expect(await screen.findByText('Purchased book')).toBeInTheDocument();
@@ -734,7 +783,7 @@ describe('saved gifts bought by someone else', () => {
       return fallback(url,options);
     });
     render(<App/>);
-    fireEvent.click(await screen.findByText(/^Saved for later/));
+    fireEvent.click(await screen.findByRole('button',{name:/^Saved items/}));
     expect(await screen.findByRole('heading',{name:'Saved teddy'})).toBeInTheDocument();
     expect(screen.getByText('SOLD').closest('.gift-status-overlay')).toBeInTheDocument();
     expect(screen.getByRole('button',{name:'Unheart'})).toBeInTheDocument();
@@ -787,7 +836,7 @@ it('keeps purchased gifts in searchable history instead of the gifting page', as
 it('hides empty saved search and opens the shared gift finder from Add gift',async()=>{
  registered=true;window.history.replaceState({},'', '/gifting');
  render(<App/>);
- fireEvent.click(await screen.findByText('Saved for later'));
+ fireEvent.click(await screen.findByRole('button',{name:/^Saved items/}));
  const add=await screen.findByRole('button',{name:'Add gift'});
  expect(screen.queryByLabelText('Search saved gifts')).not.toBeInTheDocument();
  fireEvent.click(add);
@@ -897,7 +946,7 @@ it('filters gifts from multiple followed people by budget and restores every pri
  const gift=(id,name,price,family,currency='USD')=>({id,name,recipient:'Person '+id,profile_id:id,estimated_price:price,currency,households:[{id:family,name:'Family '+family}],availability:{available:1,reserved:0,purchased:0}});
  fetch.mockImplementation((url,options)=>url.startsWith('/api/shopping?')?jsonResponse({items:[gift(1,'Small puzzle',10,11),gift(2,'Story book',25,12),gift(3,'Expensive console',500,11),gift(4,'Unpriced wish',null,12),gift(5,'Euro gift',10,12,'EUR')]}):fallback(url,options));
  render(<App/>);
- fireEvent.click(await screen.findByText('Saved for later'));
+ fireEvent.click(await screen.findByRole('button',{name:/^Saved items/}));
  fireEvent.click(await screen.findByRole('button',{name:'Add gift'}));
  const dialog=await screen.findByRole('dialog');
  await within(dialog).findByRole('heading',{name:'Expensive console'});

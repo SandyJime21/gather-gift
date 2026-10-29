@@ -5,7 +5,7 @@ import AppNavigation from './AppNavigation.jsx';
 it('has five labeled icon destinations and marks Following active for games',()=>{
  render(<MemoryRouter initialEntries={['/games?create=1']}><AppNavigation/></MemoryRouter>);
  expect(screen.getAllByRole('link')).toHaveLength(5);
- for(const name of ['My wishes','Following','Discover','My gifting','Settings'])expect(screen.getByRole('link',{name}).querySelector('svg')).toBeTruthy();
+ for(const name of ['My wishes','Following','Discover','Saved items','Settings'])expect(screen.getByRole('link',{name}).querySelector('svg')).toBeTruthy();
  expect(screen.getByRole('link',{name:'Following'})).toHaveAttribute('aria-current','page');
  expect(screen.getByRole('link',{name:'Discover'})).toHaveAttribute('href','/discover');
 });

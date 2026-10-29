@@ -5,6 +5,22 @@ import ProfileListsEditor from './ProfileListsEditor.jsx';
 import {api} from './lib/api.js';
 vi.mock('./lib/api.js',()=>({api:vi.fn()}));
 beforeEach(()=>{api.mockReset();});
+it('creates the first list without requiring child mode or a PIN',async()=>{
+ api.mockImplementation(async(path,options)=>{
+  if(path==='/profiles/7')return {profile:{id:7,can_edit:true,can_add:true}};
+  if(path==='/profiles/7/wishlists'&&options?.method==='POST')return {wishlist:{id:13,title:'Christmas'}};
+  if(path==='/profiles/7/wishlists')return {wishlists:[]};
+  return {items:[]};
+ });
+ render(<MemoryRouter><ProfileListsEditor profile={{id:7}}/></MemoryRouter>);
+ const name=await screen.findByLabelText('New list name');
+ fireEvent.change(name,{target:{value:'Christmas'}});
+ fireEvent.click(screen.getByRole('button',{name:'Create list'}));
+ expect(await screen.findByRole('button',{name:'Rename Christmas'})).toBeInTheDocument();
+ expect(screen.getByLabelText('Wishlist')).toHaveValue('13');
+ expect(api).toHaveBeenCalledWith('/profiles/7/wishlists',expect.objectContaining({method:'POST',body:JSON.stringify({title:'Christmas'})}));
+ expect(api).not.toHaveBeenCalledWith('/household-session/pin',expect.anything());
+});
 it('lets an authorized manager rename lists and edit their gifts inside the dialog section',async()=>{
  let name='Puzzle';
  api.mockImplementation(async(path,options)=>{

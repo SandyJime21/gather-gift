@@ -5,6 +5,30 @@ import { api } from './lib/api.js';
 vi.mock('./lib/api.js',()=>({api:vi.fn(),mediaUrl:p=>p}));
 vi.mock('./PhotoCropper.jsx',()=>({usePhotoCrop:()=>({crop:async file=>file || null,cropper:null})}));
 afterEach(()=>vi.clearAllMocks());
+it.each([false,true])('lets the family creator set or change a PIN inside a child profile, existing PIN: %s',async hasPin=>{
+ const home={id:1,name:'Family',role:'owner',registry_type:'family'};
+ const member={id:7,display_name:'Mia',profile_type:'person',is_adult:false,can_edit:true};
+ api.mockImplementation(async(path)=>{
+  if(path==='/household-session/switch')return {};
+  if(path==='/households/1')return {household:home,profiles:[member]};
+  if(path==='/profiles/7/child-controls')return {has_parent_pin:hasPin,enabled:false,controls:{},wishlists:[],wishlist_ids:[]};
+  if(path==='/household-session/pin')return {status:'saved'};
+  throw Error(path);
+ });
+ render(<FamilyEditor households={[home]} member={member} label="Mia" refresh={async()=>{}} BirthdayInput={()=>null} RelationshipSelect={()=>null}/>);
+ fireEvent.click(screen.getByRole('button',{name:'Mia Parent managed'}));
+ fireEvent.click(await screen.findByRole('button',{name:'Set parent PIN / child access'}));
+ const pin=await screen.findByLabelText('Parent PIN');
+ expect(screen.getAllByRole('dialog')).toHaveLength(1);
+ expect(pin).toBeVisible();expect(pin).toBeEnabled();
+ fireEvent.change(pin,{target:{value:'123456'}});
+ fireEvent.change(screen.getByLabelText('Confirm parent PIN'),{target:{value:'123456'}});
+ fireEvent.change(screen.getByLabelText('Your account password'),{target:{value:'parent-password'}});
+ fireEvent.click(screen.getByRole('button',{name:'Save parent PIN'}));
+ expect(await screen.findByText('Parent PIN saved.')).toBeInTheDocument();
+ expect(api).toHaveBeenCalledWith('/household-session/pin',{method:'POST',body:JSON.stringify({pin:'123456',password:'parent-password'})});
+ expect(api).not.toHaveBeenCalledWith('/profiles/7/child-controls',expect.objectContaining({method:'PATCH'}));
+});
 it.each([false,true])('adds a member with details open and a photo below, retrying without duplicate profiles: %s',async retry=>{
  const home={id:1,name:'Family',role:'owner'};let profile=null,created=0,uploads=0;
  api.mockImplementation(async(path,options)=>{
@@ -139,11 +163,15 @@ it('opens a member directly and highlights missing details until they are filled
  render(<FamilyEditor households={[home]} member={member} label="Alex" refresh={async()=>{}} BirthdayInput={()=>null} RelationshipSelect={()=>null}/>);
  fireEvent.click(screen.getByRole('button',{name:'Alex'}));
  const allergy=await screen.findByLabelText('Allergies & sensitivities');
+ const before=Number(screen.getByRole('progressbar',{name:'Alex profile complete'}).getAttribute('value'));
+ expect(screen.getByRole('progressbar',{name:'Alex profile complete'}).closest('[title]')).toHaveAttribute('title',expect.stringContaining('Allergies or none known'));
  expect(screen.queryByLabelText('What would you like to edit?')).not.toBeInTheDocument();
  expect(allergy.closest('.mb-3')).toHaveClass('completion-field-missing');
  fireEvent.click(screen.getByRole('button',{name:'Allergies or none known'}));
  expect(allergy).toHaveFocus();
  fireEvent.change(allergy,{target:{value:'None known'}});
+ expect(Number(screen.getByRole('progressbar',{name:'Alex profile complete'}).getAttribute('value'))).toBeGreaterThan(before);
+ expect(screen.getByRole('progressbar',{name:'Alex profile complete'}).closest('[title]').title).not.toContain('Allergies or none known');
  expect(allergy.closest('.mb-3')).not.toHaveClass('completion-field-missing');
  expect(screen.queryByRole('button',{name:'Allergies or none known'})).not.toBeInTheDocument();
 });

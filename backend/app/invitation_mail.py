@@ -201,7 +201,7 @@ def send_game_invitation(email, title, inviter, link, names, co_buy=False):
     if not mail_configured():
         return False
     message = new_message(('Co-buy invitation: ' if co_buy else 'Gift game invitation: ') + title, email)
-    action = 'accept or decline the requested contribution' if co_buy else 'join or decline'
+    action = 'accept or decline the requested contribution' if co_buy else 'review the game and follow request separately. New here? Create a free account using this email, then choose yes or no for each invitation'
     message.set_content(f'{inviter} invited {", ".join(names)} to {title}. Sign in to {action}.\n\n{link}')
     message.add_alternative(
         f'<html><body style="{BODY_STYLE}"><h1>You are invited!</h1>'

@@ -36,10 +36,10 @@ it('finds an existing family and sends a follow request for selected lists', asy
     throw new Error(path);
   });
   render(<MemoryRouter><FamilyInvites households={[{id:1,name:'Our family',role:'owner',registry_type:'family'}]}/></MemoryRouter>);
-  expect(screen.queryByLabelText('Adult name or email')).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Person, family name or email')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button',{name:'Send request'}));
-  fireEvent.change(screen.getByLabelText('Adult name or email'),{target:{value:'alex@example.com'}});
-  fireEvent.click(screen.getByRole('button',{name:'Find family'}));
+  fireEvent.change(screen.getByLabelText('Person, family name or email'),{target:{value:'alex@example.com'}});
+  fireEvent.click(screen.getByRole('button',{name:'Find people'}));
   expect(await screen.findByText('Alex family')).toBeInTheDocument();
   expect(screen.queryByLabelText('Share this family registry')).not.toBeInTheDocument();
 

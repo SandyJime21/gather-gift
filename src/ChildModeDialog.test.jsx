@@ -54,3 +54,26 @@ it('requires an approved wishlist while child mode is enabled',async()=>{
  fireEvent.click(screen.getByLabelText('Everyday wishes'));
  await waitFor(()=>expect(screen.getByRole('button',{name:'Save child mode settings'})).toBeEnabled());
 });
+
+it('opens PIN setup directly even when a PIN already exists',async()=>{
+ api.mockResolvedValue({...initial(),has_parent_pin:true});
+ render(<ChildModeDialog profile={{id:7,display_name:'Mia'}}/>);
+ fireEvent.click(screen.getByRole('button',{name:'Set / change parent PIN'}));
+ const pin=await screen.findByLabelText('Parent PIN');
+ expect(pin.closest('details')).toBeNull();
+ expect(pin).toBeEnabled();
+});
+
+it('allows saving a PIN inline before any lists or child account are enabled',async()=>{
+ api.mockImplementation(async(path)=>path==='/household-session/pin'?{status:'saved'}:{...initial(),wishlist_ids:[],wishlists:[]});
+ render(<ChildModeDialog embedded profile={{id:7,display_name:'Mia'}}/>);
+ const pin=await screen.findByLabelText('Parent PIN');
+ expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+ fireEvent.change(pin,{target:{value:'123456'}});
+ fireEvent.change(screen.getByLabelText('Confirm parent PIN'),{target:{value:'123456'}});
+ fireEvent.change(screen.getByLabelText('Your account password'),{target:{value:'parent-password'}});
+ fireEvent.click(screen.getByRole('button',{name:'Save parent PIN'}));
+ expect(await screen.findByText('Parent PIN saved.')).toBeInTheDocument();
+ expect(api).toHaveBeenCalledWith('/household-session/pin',expect.objectContaining({method:'POST'}));
+ expect(api).not.toHaveBeenCalledWith('/profiles/7/child-controls',expect.objectContaining({method:'PATCH'}));
+});

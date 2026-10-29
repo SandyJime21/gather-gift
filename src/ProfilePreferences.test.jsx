@@ -2,6 +2,21 @@ import {expect,it,vi} from 'vitest';
 import {render,screen,fireEvent} from '@testing-library/react';
 import {GiftGuide,ProfileCompletion,ProfilePreferencesFields,preferencePayload,calculateProfileCompletion,DiscoverGiftProfile} from './ProfilePreferences.jsx';
 
+it('separates adult top and bottom sizes while preserving existing sizes',()=>{
+ const onChange=vi.fn();
+ const profile={is_adult:true,clothing_sizes:{Shirt:'M',Pants:'8',Dress:'10'}};
+ const {rerender}=render(<ProfilePreferencesFields profile={profile} onChange={onChange}/>);
+ expect(screen.getByLabelText('Top size')).toHaveValue('M');
+ expect(screen.getByLabelText('Bottom size')).toHaveValue('8');
+ expect(screen.getByLabelText('Other clothing sizes')).toHaveValue('Dress: 10');
+ fireEvent.change(screen.getByLabelText('Top size'),{target:{value:'L'}});
+ const updated=onChange.mock.lastCall[0];
+ expect(updated.clothing_sizes).toEqual({top:'L',Pants:'8',Dress:'10'});
+ rerender(<ProfilePreferencesFields profile={updated} onChange={onChange}/>);
+ fireEvent.change(screen.getByLabelText('Bottom size'),{target:{value:'12'}});
+ expect(onChange.mock.lastCall[0].clothing_sizes).toEqual({top:'L',bottom:'12',Dress:'10'});
+});
+
 it('shows sizes, stores, favorites and allergies to gift shoppers without private parent notes',()=>{
  render(<GiftGuide name="Alex" profile={{clothing_sizes:{shirt:'M'},shoe_sizes:{US:'7'},favorite_colors:['Pink'],favorite_brands:['Favorite brand'],favorite_stores:['Favorite shop'],favorite_characters:['Minnie Mouse'],allergies:'Peanuts',parent_notes:'Secret parent note',items_to_avoid:'Private notes'}} compact/>);
  expect(screen.getByText('Gift guide for Alex')).toBeInTheDocument();
