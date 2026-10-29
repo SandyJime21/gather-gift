@@ -1,0 +1,67 @@
+﻿services:
+  - type: keyvalue
+    name: gather-gift-redis
+    plan: starter
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+
+  - type: web
+    name: gather-gift
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeployTrigger: checksPass
+    preDeployCommand: flask --app backend db upgrade
+    healthCheckPath: /ready
+    disk:
+      name: family-gift-uploads
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: SESSION_TYPE
+        value: redis
+      - key: UPLOAD_FOLDER
+        value: /var/data/uploads
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: gather-gift-redis
+          property: connectionString
+      # Same-origin frontend uses RENDER_EXTERNAL_URL automatically.
+      - key: SERPAPI_API_KEY
+        value: ""
+      - key: STRIPE_SECRET_KEY
+        value: ""
+      - key: STRIPE_WEBHOOK_SECRET
+        value: ""
+      - key: AMAZON_ASSOCIATE_TAG
+        value: ""
+      - key: STORE_AFFILIATE_RULES
+        value: "{}"
+      - key: ADS_DAILY_RATE_CENTS
+        value: "0"
+      - key: ADS_WISHLIST_DAILY_RATE_CENTS
+        value: "0"
+      - key: ADS_FOLLOWING_DAILY_RATE_CENTS
+        value: "0"
+      - key: ADS_DISCOVER_DAILY_RATE_CENTS
+        value: "0"
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_STARTTLS
+        value: "true"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: MAIL_FROM
+        sync: false

@@ -1,0 +1,31 @@
+import {fireEvent,render,screen,waitFor} from '@testing-library/react';
+import {expect,it,vi} from 'vitest';
+import InlineListName from './InlineListName.jsx';
+import {api} from './lib/api.js';
+vi.mock('./lib/api.js',()=>({api:vi.fn()}));
+it('renames in place and lets Escape cancel without saving',async()=>{
+ api.mockResolvedValue({});const saved=vi.fn();
+ const view=render(<InlineListName list={{id:7,title:'Old list'}} onSaved={saved}/>);
+ fireEvent.click(screen.getByRole('button',{name:'Rename Old list'}));
+ const input=screen.getByLabelText('List name');expect(input).toHaveFocus();
+ fireEvent.change(input,{target:{value:' Birthday wishes '}});
+ fireEvent.submit(input.closest('form'));
+ await waitFor(()=>expect(saved).toHaveBeenCalledWith('Birthday wishes'));
+ expect(api).toHaveBeenCalledWith('/wishlists/7',{method:'PATCH',body:JSON.stringify({title:'Birthday wishes'})});
+ view.rerender(<InlineListName list={{id:7,title:'Birthday wishes'}} onSaved={saved}/>);
+ fireEvent.click(screen.getByRole('button',{name:'Rename Birthday wishes'}));
+ fireEvent.change(screen.getByLabelText('List name'),{target:{value:'Discard this'}});
+ fireEvent.keyDown(screen.getByLabelText('List name'),{key:'Escape'});
+ expect(screen.getByRole('button',{name:'Rename Birthday wishes'})).toBeInTheDocument();
+ expect(api).toHaveBeenCalledTimes(1);
+});
+it('keeps the form open with the typed name if saving fails',async()=>{
+ api.mockRejectedValue(new Error('Could not save.'));const saved=vi.fn();
+ render(<InlineListName list={{id:8,title:'Pets'}} onSaved={saved}/>);
+ fireEvent.click(screen.getByRole('button',{name:'Rename Pets'}));
+ fireEvent.change(screen.getByLabelText('List name'),{target:{value:'Treats'}});
+ fireEvent.submit(screen.getByLabelText('List name').closest('form'));
+ expect(await screen.findByRole('alert')).toHaveTextContent('Could not save.');
+ expect(screen.getByLabelText('List name')).toHaveValue('Treats');
+ expect(saved).not.toHaveBeenCalled();
+});

@@ -1,0 +1,7 @@
+import {useEffect,useId,useState} from 'react';
+import {Alert,Button,Form,Modal} from 'react-bootstrap';
+export default function PurchaseConfirmation({show,onHide,onConfirm,busy=false,error='',deliveryMethod='undecided'}){
+ const [secret,setSecret]=useState(true),[method,setMethod]=useState(deliveryMethod);const id=useId();
+ useEffect(()=>{if(show){setSecret(true);setMethod(deliveryMethod);}},[show,deliveryMethod]);
+ return <Modal show={show} onHide={onHide} centered><Modal.Header closeButton><Modal.Title>Keep it a secret?</Modal.Title></Modal.Header><Modal.Body>{error&&<Alert variant="danger">{error}</Alert>}<Form.Group controlId={'gift-handover-'+id} className="mb-3"><Form.Label>How will they receive it?</Form.Label><Form.Select value={method} onChange={e=>setMethod(e.target.value)}><option value="undecided">Not decided</option><option value="shipping">Shipping to them</option><option value="in_person">Giving in person</option></Form.Select></Form.Group><Form.Check type="switch" id={'purchase-secret-'+id} label="Hide who bought this gift" checked={secret} onChange={e=>setSecret(e.target.checked)}/><p className="small text-secondary mt-2">The gift will show as purchased. Turn this off to show your family name.</p></Modal.Body><Modal.Footer><Button variant="outline-secondary" onClick={onHide}>Cancel</Button><Button disabled={busy} onClick={()=>onConfirm(secret,method)}>Confirm purchase</Button></Modal.Footer></Modal>;
+}

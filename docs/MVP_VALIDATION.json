@@ -1,0 +1,81 @@
+{
+  "reviewDate": "2026-10-27",
+  "timezone": "America/Los_Angeles",
+  "assessment": "Feature implementation substantially complete; release acceptance incomplete; not beta/public-launch certified",
+  "frontend": {
+    "command": "npm.cmd test -- --reporter=json --outputFile=docs/mvp-frontend-results.json",
+    "success": true,
+    "passed": 123,
+    "failed": 0,
+    "total": 123,
+    "files": 28,
+    "report": "docs/mvp-frontend-results.json"
+  },
+  "build": {
+    "command": "npm.cmd run build",
+    "exitCode": 0,
+    "status": "passed",
+    "advisory": "Main JavaScript chunk exceeds 500 KB; route/component splitting is a performance follow-up"
+  },
+  "backend": {
+    "status": "blocked_not_run",
+    "command": "python -m pytest backend/tests -q --basetemp=backend/instance/mvp-review-20261027",
+    "reason": "Python executable cannot be accessed/run; Docker fallback engine unavailable and user config unreadable",
+    "historicalCountsAreNotCurrent": true
+  },
+  "database": {
+    "sourceHead": "f73d8b26ae10",
+    "singleSourceHead": true,
+    "migrationAppliedThisReview": false,
+    "disposableMySQLValidated": false,
+    "freshSchemaParityValidated": false
+  },
+  "liveChecks": {
+    "browserDevice": false,
+    "SMTP": false,
+    "StripeTestCheckoutWebhook": false,
+    "SerpApi": false,
+    "affiliateCommissions": false,
+    "productionDeployment": false,
+    "MySQLConcurrency": false,
+    "backupRestore": false
+  },
+  "copilotReviewExecuted": false,
+  "inventory": "docs/MVP_INVENTORY.md",
+  "readiness": "docs/MVP_READINESS.md",
+  "reviewPrompt": "docs/COPILOT_MVP_REVIEW.md",
+  "routeCatalog": "docs/MVP_API_ROUTES.md",
+  "apiRouteEntries": 179,
+  "reviewFixes": [
+    {
+      "id": "MVP-01",
+      "area": "Advertising deep links and staff auth return",
+      "verification": "Frontend regression passed"
+    },
+    {
+      "id": "MVP-02",
+      "area": "Private list metadata",
+      "verification": "Backend regression added; not run"
+    },
+    {
+      "id": "MVP-03",
+      "area": "Private list revocation releases inaccessible holds",
+      "verification": "Backend regression added; not run"
+    },
+    {
+      "id": "MVP-04",
+      "area": "Private and cross-list delivery data plus shopper preview",
+      "verification": "Backend regression added; not run"
+    },
+    {
+      "id": "MVP-05",
+      "area": "Help escalation messaging",
+      "verification": "Existing frontend checks passed"
+    },
+    {
+      "id": "MVP-06",
+      "area": "Personal-wish audience enforcement on generic family-visible item paths",
+      "verification": "Backend regression added; not run"
+    }
+  ]
+}

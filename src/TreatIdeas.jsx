@@ -1,0 +1,16 @@
+import {useState} from 'react';
+const treats=[
+ {name:'Chocolate gift box',label:'Chocolate',icon:'chocolate',color:'cocoa'},
+ {name:'Coffee and tea sampler',label:'Coffee & tea',icon:'coffee',color:'latte'},
+ {name:'Savory snack collection',label:'Snacks',icon:'snacks',color:'peach'},
+ {name:'Baking gift set',label:'Baking',icon:'cake',color:'berry'},
+ {name:'Ice cream gift basket',label:'Ice cream',icon:'icecream',color:'mint'},
+ {name:'Candy gift box',label:'Candy',icon:'candy',color:'lavender'},
+];
+function TreatArt({kind}){
+ return <svg viewBox="0 0 80 80" fill="none" aria-hidden="true"><ellipse cx="40" cy="69" rx="23" ry="4" fill="currentColor" opacity=".1"/>{kind==='icecream'?<><path d="m27 40 13 29 13-29" fill="#d9a36d"/><path d="m31 44 15 15m-10-15 12 11m-17-3 15-8" stroke="#b57c4d" strokeWidth="2"/><circle cx="40" cy="30" r="18" fill="#fff7ed"/><circle cx="30" cy="36" r="10" fill="#f1aac4"/><circle cx="48" cy="35" r="11" fill="#f1aac4"/><path d="m36 18 3 2m8 3 2-3m-8 15 3 1" stroke="#b85465" strokeWidth="3" strokeLinecap="round"/></>:kind==='coffee'?<><path d="M20 29h36v25a12 12 0 0 1-12 12H32a12 12 0 0 1-12-12V29Z" fill="#fff7ed"/><path d="M56 34h5a9 9 0 0 1 0 18h-5M30 20c-5-6 5-6 0-12m13 12c-5-6 5-6 0-12" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/><ellipse cx="38" cy="30" rx="17" ry="5" fill="#845444"/></>:kind==='chocolate'?<><rect x="20" y="12" width="40" height="54" rx="5" fill="#765044" transform="rotate(10 40 40)"/><path d="M22 39h38v27H22V39Z" fill="#e9a6b5"/><path d="M32 15v22m14-20v20M24 27h31" stroke="#b38368" strokeWidth="3"/></>:kind==='cake'?<><path d="m21 42 6 23h27l6-23" fill="#e8ac7c"/><path d="M23 44c-12-8-3-18 7-18-2-14 20-14 19 0 15-1 22 15 9 18H23Z" fill="#fff6ed"/><circle cx="40" cy="17" r="6" fill="#d84762"/><path d="m30 49 3 12m15-12-3 12" stroke="#bf815b" strokeWidth="2"/></>:kind==='candy'?<><path d="m13 27 17 6-2 16-17 4 5-13-3-13Zm54 0-17 6 2 16 17 4-5-13 3-13Z" fill="#e99bb9"/><rect x="24" y="26" width="32" height="30" rx="12" fill="#fff7ee" transform="rotate(-12 40 40)"/><path d="m35 29 10 22" stroke="#d45a7a" strokeWidth="9"/></>:<><path d="m22 17 4 47h30l4-47H22Z" fill="#fff2da"/><path d="M22 17h38m-34 8h30M26 62h30" stroke="#d98b5e" strokeWidth="4"/><circle cx="37" cy="41" r="10" fill="#e6ad64"/><circle cx="46" cy="49" r="10" fill="#e6ad64"/><path d="m34 39 3 2m8 7 3 2m-8 1 2 2" stroke="#875440" strokeWidth="3"/></>}</svg>;
+}
+export default function TreatIdeas({onChoose}){
+ const [chosen,setChosen]=useState('');
+ return <section className="treat-shop mt-3" aria-label="Snacks and treats"><div className="treat-shop-intro"><div><span className="treat-shop-eyebrow">A little delicious</span><h3>Sweet little gifts.</h3><p>Find their next favorite treat.</p></div><div className="treat-shop-hero-art"><TreatArt kind="icecream"/></div></div><div className="treat-category-rail">{treats.map(t=><button key={t.name} type="button" className={'treat-category treat-'+t.color} aria-label={t.name} aria-pressed={chosen===t.name} onClick={()=>{setChosen(t.name);onChoose({query:t.name,category:'Food & treats'});}}><span className="treat-art"><TreatArt kind={t.icon}/></span><span>{t.label}</span><span className="treat-category-arrow" aria-hidden="true">&#8599;</span></button>)}</div></section>;
+}
