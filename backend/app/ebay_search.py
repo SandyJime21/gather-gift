@@ -111,6 +111,6 @@ def search_ebay(query):
         if not isinstance(currency,str) or not re.fullmatch(r'[A-Z]{3}',currency):
             currency='USD';price=''
         image=row.get('image') if isinstance(row.get('image'),dict) else {}
-        products.append({'name':title.strip()[:200],'product_url':link,'store_name':'eBay',
+        products.append({'name':title.strip()[:200],'product_url':link,'store_name':'eBay','source_product_id':str(row.get('itemId',''))[:200],
                          'estimated_price':price,'currency':currency,'thumbnail':safe_product_url(image.get('imageUrl'))})
     return products

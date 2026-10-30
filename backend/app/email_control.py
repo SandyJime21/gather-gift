@@ -1,4 +1,4 @@
-"""Master-only previews and self-addressed samples of the real email templates."""
+"""Master-only previews and explicitly addressed samples of real email templates."""
 import smtplib
 from html import escape
 from flask import request, jsonify, g, current_app
@@ -113,13 +113,15 @@ def send_email_samples():
     payload = request.get_json(silent=True) or {}
     ids = payload.get('template_ids')
     valid = {key for key,_ in TEMPLATES}
-    if set(payload) != {'template_ids'} or not isinstance(ids,list) or not ids or any(not isinstance(key,str) or key not in valid for key in ids):
-        return error('Choose valid email templates. Samples are sent only to your own staff email.', 400)
+    if set(payload)-{'template_ids','email'} or not isinstance(ids,list) or not ids or any(not isinstance(key,str) or key not in valid for key in ids):
+        return error('Choose valid email templates and a test recipient.', 400)
+    email = normalized_email(payload.get('email',request.current_user.email))
+    if not email:
+        return error('Enter a valid test email address.',400)
     if not mail.mail_configured():
         return error('Configure SMTP before sending samples. You can still preview every template here.', 503)
-    email = request.current_user.email
     if suppressed(email):
-        return error('Your email address is unsubscribed. Restore email delivery before sending samples.', 409)
+        return error('This test recipient has unsubscribed. Choose another recipient or have them restore delivery.', 409)
     messages = sample_messages(email)
     sent = failed = 0
     for key in dict.fromkeys(ids):
@@ -132,7 +134,7 @@ def send_email_samples():
             failed += 1
     preview = bool(current_app.config.get('MAIL_OUTBOX_DIR'))
     record_audit(request.current_user.id, 'email_templates.sample_sent', 'email_template',
-                 details={'template_ids':list(dict.fromkeys(ids)), 'sent':sent, 'failed':failed, 'preview':preview})
+                 details={'template_ids':list(dict.fromkeys(ids)), 'recipient':email, 'sent':sent, 'failed':failed, 'preview':preview})
     db.session.commit()
     return jsonify(sent=0 if preview else sent, previewed=sent if preview else 0, failed=failed,
                    error='Sample emails could not be delivered.' if not sent else None), 200 if sent else 503

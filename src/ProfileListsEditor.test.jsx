@@ -63,7 +63,7 @@ it('lets an authorized manager rename lists and edit their gifts inside the dial
  expect(await screen.findByRole('button',{name:'Rename Christmas'})).toBeInTheDocument();
  fireEvent.click(await screen.findByRole('button',{name:'Edit gift'}));
  fireEvent.change(screen.getByLabelText('Gift name'),{target:{value:'Bigger puzzle'}});
- fireEvent.submit(screen.getByLabelText('Gift name').closest('form'));
+ fireEvent.click(screen.getByRole('button',{name:'Save gift'}));
  expect(await screen.findByText('Bigger puzzle')).toBeInTheDocument();
  expect(api).toHaveBeenCalledWith('/items/12',expect.objectContaining({method:'PATCH'}));
 });

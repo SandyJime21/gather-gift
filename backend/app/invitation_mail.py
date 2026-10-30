@@ -7,6 +7,7 @@ import re
 import smtplib
 import ssl
 import certifi
+from uuid import uuid4
 from flask import current_app, g
 
 GETTING_STARTED = (
@@ -63,7 +64,7 @@ def deliver(message):
         folder = Path(outbox)
         folder.mkdir(parents=True, exist_ok=True)
         slug = re.sub(r'[^a-z0-9]+', '-', str(message['Subject']).lower()).strip('-')[:60]
-        (folder / f"{datetime.now().strftime('%H%M%S%f')}-{slug}.eml").write_bytes(bytes(message))
+        (folder / f"{datetime.now().strftime('%H%M%S%f')}-{uuid4().hex}-{slug}.eml").write_bytes(bytes(message))
         return
     with smtplib.SMTP(current_app.config['SMTP_HOST'], current_app.config['SMTP_PORT'], timeout=10) as smtp:
         if current_app.config['SMTP_STARTTLS']:

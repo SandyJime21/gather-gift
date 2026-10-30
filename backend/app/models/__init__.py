@@ -602,3 +602,30 @@ class LetterArtPurchase(db.Model):
 class EmailTemplateDesign(db.Model):
     template_id = db.Column(db.String(60), primary_key=True)
     blocks = db.Column(db.JSON, nullable=False)
+
+
+class CommerceIntegration(db.Model):
+    provider = db.Column(db.String(30), primary_key=True)
+    enabled = db.Column(db.Boolean, nullable=False, default=False)
+    approved = db.Column(db.Boolean, nullable=False, default=False)
+    merchant_rules = db.Column(db.JSON, nullable=False, default=dict)
+    last_error = db.Column(db.String(120))
+    last_error_at = db.Column(db.DateTime(timezone=True))
+    updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
+
+
+class CommerceProductMetadata(db.Model):
+    item_id = db.Column(db.Integer, db.ForeignKey('wishlist_item.id',ondelete='CASCADE'), primary_key=True)
+    retailer_domain = db.Column(db.String(253), nullable=False)
+    source_provider = db.Column(db.String(30), nullable=False, default='manual')
+    external_product_id = db.Column(db.String(200))
+    last_verified_at = db.Column(db.DateTime(timezone=True))
+
+
+class CommerceOutboundEvent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.Integer, db.ForeignKey('wishlist_item.id',ondelete='SET NULL'), nullable=True)
+    provider = db.Column(db.String(30), nullable=False)
+    merchant = db.Column(db.String(253), nullable=False)
+    attribution_id = db.Column(db.String(32), nullable=False, unique=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, index=True)

@@ -24,6 +24,7 @@ def test_only_explicit_product_prices_are_used(html,expected):
 
 
 def test_link_preview_reads_image_and_title_without_leaking_network_access(app, monkeypatch):
+    app.config['PERMITTED_METADATA_DOMAINS']='shop.example'
     monkeypatch.setattr('backend.app.link_preview.socket.getaddrinfo', fake_dns)
     connections = []
     class Response:

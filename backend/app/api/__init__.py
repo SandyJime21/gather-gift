@@ -254,7 +254,7 @@ def profile_access(user, profile_id, write=False):
     if linked and not linked.is_child and linked.id==user.id:
         return profile
     active_id = session.get('active_member_profile_id') if session.get('user_id') == user.id else None
-    if write and active_id and active_id != profile.id:
+    if write and active_id and active_id != profile.id and not (profile.is_adult and profile.account_user_id is None):
         active = db.session.get(PersonProfile, active_id)
         if not active or not active.is_guardian or profile.is_adult:
             return None
@@ -489,6 +489,7 @@ def reservation_summary(item, user):
 
 
 def item_dict(item, user):
+    from ..commerce import shopping_url
     data = {
         "id": item.id,
         "profile_id": item.profile_id,
@@ -500,6 +501,7 @@ def item_dict(item, user):
         "store_name": item.store_name,
         "product_url": shopping_link(item.product_url),
         "original_product_url": item.product_url,
+        "shopping_url": shopping_url(item),
         "estimated_price": str(item.estimated_price) if item.estimated_price is not None else None,
         "currency": item.currency,
         "desired_size": item.desired_size,
@@ -1601,6 +1603,23 @@ def create_gift(wishlist_id):
             can_add_child_gift(request.current_user, db.session.get(PersonProfile, wishlist.profile_id))):
         return error("Wishlist not found or edit permission denied.", 404)
     payload = request.get_json(silent=True) or {}
+    if type(payload.get('avoid_duplicate',False)) is not bool:
+        return error('Choose a valid duplicate-save option.',400)
+    if payload.get('avoid_duplicate'):
+        from ..commerce_urls import validated_product_url
+        try:
+            validated_product_url(payload.get('product_url'))
+            if payload.get('image_url'):
+                validated_product_url(payload['image_url'])
+            for field,limit in (('description',2000),('notes',2000),('store_name',120)):
+                if payload.get(field) is not None and (not isinstance(payload[field],str) or len(payload[field])>limit):
+                    raise ValueError('Keep gift details within their field limits.')
+        except ValueError as exc:
+            return error(str(exc),400)
+        db.session.query(Wishlist.id).filter_by(id=wishlist.id).with_for_update().first()
+        existing=WishlistItem.query.join(WishlistItemWishlist).filter(WishlistItemWishlist.wishlist_id==wishlist.id,WishlistItem.product_url==payload['product_url']).first()
+        if existing:
+            return jsonify(item=item_dict(existing,request.current_user),already_saved=True),200
     name = str(payload.get("name", "")).strip()
     try:
         quantity = int(payload.get("quantity", 1))
@@ -1655,6 +1674,8 @@ def create_gift(wishlist_id):
     db.session.add(WishlistItemWishlist(item_id=item.id, wishlist_id=wishlist.id))
     if wishlist.occasion_id:
         db.session.add(WishlistItemOccasion(item_id=item.id, occasion_id=wishlist.occasion_id))
+    from ..commerce import record_product_metadata
+    record_product_metadata(item)
     db.session.commit()
     return jsonify({"item": item_dict(item, request.current_user)}), 201
 
@@ -1666,6 +1687,10 @@ def update_gift(item_id):
     if item is None or not can_manage_wishes(request.current_user, item.profile):
         return error("Gift not found or edit permission denied.", 404)
     payload = request.get_json(silent=True) or {}
+    if 'currency' in payload and (not isinstance(payload['currency'],str) or not re.fullmatch('[A-Za-z]{3}',payload['currency'])):
+        return error('Choose a valid three-letter currency.',400)
+    if 'currency' in payload:
+        payload['currency']=payload['currency'].upper()
     if "family_only" in payload:
         if not isinstance(payload["family_only"], bool):
             return error("Family-only visibility must be true or false.", 400)
@@ -1715,7 +1740,7 @@ def update_gift(item_id):
             price = Decimal(str(payload["estimated_price"])) if payload["estimated_price"] not in (None, "") else None
         except (TypeError, ValueError, InvalidOperation):
             return error("Price is invalid.", 400)
-        if price is not None and (price < 0 or price > Decimal("99999999.99")):
+        if price is not None and (not price.is_finite() or price < 0 or price > Decimal("99999999.99")):
             return error("Price must be a non-negative amount.", 400)
         item.estimated_price = price
     db.session.commit()
@@ -3314,7 +3339,11 @@ def gift_discovery():
     if not search_configured():
         return jsonify({"enabled": False, "products": [], "message": "Live product results are not available yet. Browse Google or a store below, or save your idea with an automatic shopping link."})
     try:
-        products = search_products(query)
+        selected={key:request.args[key] for key in ('store','brand','category','min_price','max_price','currency') if key in request.args}
+        from ..product_search import validate_filters
+        try:validate_filters(selected)
+        except ValueError as exc:return error(str(exc),400)
+        products = search_products(query,filters=selected) if selected else search_products(query)
     except (OSError, ValueError, TypeError):
         return error("Product search is temporarily unavailable. You can still browse Google or the stores below.", 502)
     return jsonify({"enabled": True, "products": [{**product, "shopping_url": shopping_link(product["product_url"])} for product in products]})
@@ -4056,6 +4085,22 @@ def personal_wish_values(payload, user, existing=None):
     except (InvalidOperation, ValueError):
         raise ValueError('Enter a valid price.')
     values['estimated_price'] = price
+    currency=payload.get('currency',existing.currency if existing else 'USD')
+    if not isinstance(currency,str) or not re.fullmatch('[A-Za-z]{3}',currency):
+        raise ValueError('Choose a valid three-letter currency.')
+    values['currency']=currency.upper()
+    try:
+        quantity=int(payload.get('quantity',existing.quantity if existing else 1))
+    except (TypeError,ValueError):
+        raise ValueError('Choose a positive quantity.')
+    if quantity<1 or quantity>10000:
+        raise ValueError('Choose a quantity between 1 and 10,000.')
+    values['quantity']=quantity
+    for field in ('notes','category'):
+        value=payload.get(field,getattr(existing,field,'') if existing else '') or ''
+        if not isinstance(value,str) or len(value)> (120 if field=='category' else 2000):
+            raise ValueError('Keep gift notes and category within their length limits.')
+        values[field]=value
     try:
         priority = int(payload.get('priority', existing.priority if existing else 2))
     except (ValueError, TypeError):
@@ -4075,6 +4120,19 @@ def personal_wish_values(payload, user, existing=None):
 def create_personal_wish():
     user = User.query.filter_by(id=request.current_user.id).with_for_update().first()
     payload = request.get_json(silent=True) or {}
+    if type(payload.get('avoid_duplicate',False)) is not bool:
+        return error('Choose a valid duplicate-save option.',400)
+    if payload.get('avoid_duplicate'):
+        from ..commerce_urls import validated_product_url
+        try:
+            validated_product_url(payload.get('product_url'))
+            if payload.get('image_url'):
+                validated_product_url(payload['image_url'])
+        except ValueError as exc:
+            return error(str(exc),400)
+        existing=PersonalWish.query.join(WishlistItem).filter(PersonalWish.owner_id==user.id,WishlistItem.product_url==payload['product_url'],PersonalWish.occasion==str(payload.get('occasion','')).strip()).first()
+        if existing:
+            return jsonify(wish=personal_wish_dict(existing,user,True),already_saved=True),200
     try:
         values, viewers = personal_wish_values(payload, user)
     except ValueError as exc:
@@ -4104,6 +4162,8 @@ def create_personal_wish():
     db.session.flush()
     for viewer_id in viewers:
         db.session.add(PersonalWishViewer(wish_id=wish.id, user_id=viewer_id))
+    from ..commerce import record_product_metadata
+    record_product_metadata(item)
     db.session.commit()
     return jsonify({'wish': personal_wish_dict(wish, user, True)}), 201
 

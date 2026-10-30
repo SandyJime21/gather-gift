@@ -1,0 +1,10 @@
+[
+  {"name":"Walmart","domain":"walmart.com","mark":"W","color":"#1259ac","search":"https://www.walmart.com/search?q=","affiliate_approved":false},
+  {"name":"Target","domain":"target.com","mark":"T","color":"#b51f2a","search":"https://www.target.com/s?searchTerm=","affiliate_approved":false},
+  {"name":"Amazon","domain":"amazon.com","mark":"a","color":"#263347","search":"https://www.amazon.com/s?k=","affiliate_approved":false},
+  {"name":"Etsy","domain":"etsy.com","mark":"E","color":"#b74a1e","search":"https://www.etsy.com/search?q=","affiliate_approved":false},
+  {"name":"Best Buy","domain":"bestbuy.com","mark":"B","color":"#263347","search":"https://www.bestbuy.com/site/searchpage.jsp?st=","affiliate_approved":false},
+  {"name":"eBay","domain":"ebay.com","mark":"e","color":"#263347","search":"https://www.ebay.com/sch/i.html?_nkw=","affiliate_approved":false},
+  {"name":"Google Shopping","domain":"google.com","mark":"G","color":"#3155a4","search":"https://www.google.com/search?tbm=shop&q=","affiliate_approved":false},
+  {"name":"Google","domain":"google.com","mark":"G","color":"#3155a4","search":"https://www.google.com/search?q=","affiliate_approved":false}
+]

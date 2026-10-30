@@ -148,3 +148,17 @@ def test_authorized_owner_manages_unclaimed_adult_wishes_without_switching_profi
     assert mutate(stranger,'PATCH',f'/api/items/{item_id}',dict(name='No')).status_code==404
     assert mutate(owner,'PATCH',f'/api/items/{item_id}',dict(name='A cookbook')).status_code==200
     assert mutate(owner,'DELETE',f'/api/items/{item_id}').status_code==200
+
+
+def test_owner_active_on_own_profile_can_manage_unclaimed_adult(app):
+    owner=app.test_client();register(owner,'Owner','active-owner@example.com')
+    result=mutate(owner,'POST','/api/households',{'name':'Family','self_profile_index':'new','profiles':[{'display_name':'Partner','relationship':'parent'}]})
+    assert result.status_code==201,result.json
+    home=result.json['household']
+    profile=next(p for p in owner.get(f"/api/households/{home['id']}").json['profiles'] if p['display_name']=='Partner')
+    assert profile['can_edit']
+    wishlist=create_test_wishlist(owner,f"/api/profiles/{profile['id']}/wishlists")
+    item=mutate(owner,'POST',f"/api/wishlists/{wishlist['id']}/items",{'name':'Book'}).json['item']
+    assert mutate(owner,'PATCH',f"/api/items/{item['id']}",{'name':'Better book','estimated_price':'12.50','currency':'cad'}).status_code==200
+    for payload in ({'estimated_price':'NaN'},{'currency':'invalid'}):
+        assert mutate(owner,'PATCH',f"/api/items/{item['id']}",payload).status_code==400

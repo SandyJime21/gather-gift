@@ -8,6 +8,18 @@ from backend.app.email_preferences import preference_link
 from backend.app import invitation_mail as mail
 
 
+def test_master_can_send_selected_template_to_test_recipient(app,tmp_path):
+    app.config['MAIL_OUTBOX_DIR']=str(tmp_path)
+    admin=app.test_client();staff_login(admin)
+    result=mutate(admin,'POST','/api/support/email-templates/send',{'template_ids':['game-invite'],'email':'qa@example.com'})
+    assert result.status_code==200 and result.json['previewed']==1
+    message=message_from_bytes(next(tmp_path.glob('*.eml')).read_bytes(),policy=policy.default)
+    assert str(message['To'])=='qa@example.com'
+    assert 'sample' in message.get_body(preferencelist=('plain',)).get_content().lower() or '[Template preview]' in message['Subject']
+    assert mutate(admin,'POST','/api/support/email-suppressions',{'email':'qa@example.com','unsubscribed':True}).status_code==200
+    assert mutate(admin,'POST','/api/support/email-templates/send',{'template_ids':['game-invite'],'email':'qa@example.com'}).status_code==409
+
+
 def test_block_design_preserves_live_content_and_csv(app, tmp_path):
     app.config['MAIL_OUTBOX_DIR'] = str(tmp_path)
     admin=app.test_client();staff_login(admin)
@@ -58,11 +70,11 @@ def test_master_can_preview_all_real_templates_without_sending(app, monkeypatch)
     assert admin.get('/api/support/email-templates').status_code == 403
 
 
-def test_samples_only_go_to_master_address_and_respect_unsubscribe(app, tmp_path, monkeypatch):
+def test_samples_default_to_master_address_and_respect_unsubscribe(app, tmp_path, monkeypatch):
     app.config['MAIL_OUTBOX_DIR'] = str(tmp_path)
     monkeypatch.setattr(mail.smtplib, 'SMTP', lambda *args,**kwargs: (_ for _ in ()).throw(AssertionError('Must use test outbox')))
     admin = app.test_client();staff_login(admin)
-    assert mutate(admin,'POST','/api/support/email-templates/send',{'template_ids':['game-invite'],'email':'other@example.com'}).status_code == 400
+    assert mutate(admin,'POST','/api/support/email-templates/send',{'template_ids':['game-invite'],'email':'not-an-email'}).status_code == 400
     result = mutate(admin,'POST','/api/support/email-templates/send',{'template_ids':['game-invite']})
     assert result.status_code == 200 and result.json['previewed'] == 1 and result.json['sent'] == 0
     files = list(tmp_path.glob('*.eml'));assert len(files) == 1

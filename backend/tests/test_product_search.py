@@ -57,4 +57,5 @@ def test_product_results_are_normalized_and_key_stays_server_side(app, monkeypat
     def failed_open(*args, **kwargs):
         raise OSError('Provider unavailable')
     monkeypatch.setattr('backend.app.product_search.urlopen', failed_open)
+    app.extensions.get('commerce_search_cache',{}).clear()
     assert client.get('/api/gift-discovery?q=flowers').status_code == 502

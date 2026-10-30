@@ -1,0 +1,42 @@
+import {fireEvent,render,screen,waitFor,within} from '@testing-library/react';
+import {afterEach,expect,it,vi} from 'vitest';
+import UniversalGift from './UniversalGift.jsx';
+import {api} from './lib/api.js';
+vi.mock('./lib/api.js',()=>({api:vi.fn()}));
+afterEach(()=>vi.clearAllMocks());
+it('pastes a small-store link and saves manually in one form when metadata fails',async()=>{
+ api.mockImplementation(async(path,options)=>{if(path==='/commerce/preview')throw Error('Unavailable');if(path==='/personal-wishes')return {wish:{}};throw Error(path);});
+ render(<UniversalGift profiles={[]}/>);
+ fireEvent.click(screen.getByRole('button',{name:'+ Add Gift From Any Store'}));
+ const dialog=await screen.findByRole('dialog');
+ fireEvent.paste(within(dialog).getByLabelText('Product link'),{clipboardData:{getData:()=> 'https://small-store.example/gift?affiliate=keep-me'}});
+ await within(dialog).findByText('Automatic details are unavailable. Enter a name below and save the link.');
+ fireEvent.change(within(dialog).getByLabelText('Gift name'),{target:{value:'Handmade mug'}});
+ fireEvent.click(within(dialog).getByRole('button',{name:'Save gift'}));
+ await screen.findByText('Gift saved to My private wishes.');
+ const payload=JSON.parse(api.mock.calls.find(([path])=>path==='/personal-wishes')[1].body);
+ expect(payload).toMatchObject({name:'Handmade mug',product_url:'https://small-store.example/gift?affiliate=keep-me',avoid_duplicate:true,visibility:'private',viewer_ids:[]});
+});
+it('defaults to the selected child registry and reports an already saved gift',async()=>{
+ api.mockImplementation(async(path,options)=>path==='/profiles/7/wishlists'?{wishlists:[{id:11,title:'Birthday'},{id:12,title:'Christmas'}]}:{already_saved:true});
+ render(<UniversalGift profiles={[{id:7,display_name:'Mia',can_edit:true}]} defaultProfileId={7} defaultWishlistId={12}/>);
+ fireEvent.click(screen.getByRole('button',{name:'+ Add Gift From Any Store'}));
+ await waitFor(()=>expect(screen.getByLabelText('Registry / occasion')).toHaveValue('12'));
+ fireEvent.change(screen.getByLabelText('Product link'),{target:{value:'https://www.target.com/p/toy'}});
+ fireEvent.change(screen.getByLabelText('Gift name'),{target:{value:'Toy'}});
+ fireEvent.click(screen.getByRole('button',{name:'Save gift'}));
+ expect(await screen.findByText('This gift is already in the selected registry.')).toBeInTheDocument();
+ expect(api).toHaveBeenCalledWith('/wishlists/12/items',expect.objectContaining({method:'POST'}));
+});
+it('can switch back to private wishes while a registry request is pending',async()=>{
+ api.mockImplementation(path=>path==='/profiles/7/wishlists'?new Promise(()=>{}):Promise.resolve({wish:{}}));
+ render(<UniversalGift profiles={[{id:7,display_name:'Mia',can_edit:true}]} defaultProfileId={7}/>);
+ fireEvent.click(screen.getByRole('button',{name:'+ Add Gift From Any Store'}));
+ await waitFor(()=>expect(api).toHaveBeenCalledWith('/profiles/7/wishlists'));
+ fireEvent.change(screen.getByLabelText('Save for'),{target:{value:'me'}});
+ fireEvent.change(screen.getByLabelText('Product link'),{target:{value:'https://shop.example/mug'}});
+ fireEvent.change(screen.getByLabelText('Gift name'),{target:{value:'Mug'}});
+ expect(screen.getByRole('button',{name:'Save gift'})).toBeEnabled();
+ fireEvent.click(screen.getByRole('button',{name:'Save gift'}));
+ expect(await screen.findByText('Gift saved to My private wishes.')).toBeInTheDocument();
+});

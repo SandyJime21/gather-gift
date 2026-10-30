@@ -49,6 +49,7 @@ def create_app(test_config=None):
         ADS_FOLLOWING_DAILY_RATE_CENTS=os.getenv("ADS_FOLLOWING_DAILY_RATE_CENTS", ""),
         ADS_DISCOVER_DAILY_RATE_CENTS=os.getenv("ADS_DISCOVER_DAILY_RATE_CENTS", ""),
         SERPAPI_API_KEY=os.getenv("SERPAPI_API_KEY", ""),
+        PERMITTED_METADATA_DOMAINS=os.getenv('PERMITTED_METADATA_DOMAINS',''),
         EBAY_CLIENT_ID=os.getenv('EBAY_CLIENT_ID',''),
         EBAY_CLIENT_SECRET=os.getenv('EBAY_CLIENT_SECRET',''),
         EBAY_ENVIRONMENT=os.getenv('EBAY_ENVIRONMENT','production'),
@@ -68,6 +69,8 @@ def create_app(test_config=None):
             str(Path(__file__).resolve().parents[1] / "instance" / "uploads"),
         ),
     )
+    from .commerce_adapters import PROVIDERS as commerce_providers
+    app.config.update({key:os.getenv(key,'') for provider in commerce_providers.values() for key in provider['env']})
     if test_config:
         app.config.update(test_config)
 
@@ -136,6 +139,8 @@ def create_app(test_config=None):
     from . import wishlist_price_requests
     from . import email_preferences
     from . import email_control
+    from . import universal_gifts
+    from . import commerce
     app.register_blueprint(api, url_prefix="/api")
     from .advertising import ad_api
     app.register_blueprint(ad_api, url_prefix="/api")

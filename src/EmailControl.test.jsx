@@ -5,11 +5,22 @@ import EmailControl,{EmailPreferencesPage} from './EmailControl.jsx';
 import {api} from './lib/api.js';
 vi.mock('./lib/api.js',()=>({api:vi.fn()}));
 afterEach(()=>vi.clearAllMocks());
+it('confirms the selected recipient before sending a selected template',async()=>{
+ api.mockImplementation(async(path,options)=>options?{sent:1}:catalog);
+ render(<EmailControl/>);
+ fireEvent.change(await screen.findByLabelText('Test recipient email'),{target:{value:'qa@example.com'}});
+ fireEvent.click(screen.getByRole('button',{name:'Send selected template'}));
+ const dialog=await screen.findByRole('dialog');
+ expect(dialog).toHaveTextContent('qa@example.com');
+ expect(api).toHaveBeenCalledTimes(1);
+ fireEvent.click(within(dialog).getByRole('button',{name:'Confirm'}));
+ await waitFor(()=>expect(api).toHaveBeenCalledWith('/support/email-templates/send',{method:'POST',body:JSON.stringify({template_ids:['game-invite'],email:'qa@example.com'})}));
+});
 const catalog={templates:[{id:'game-invite',label:'Game invitation',subject:'You are invited',html:'<p>Sample</p>',text:'Sample',attachments:[]}],sample_email:'developer@example.com',mail_configured:true,unsubscribed:false};
 it('previews safely and only sends samples after explicit confirmation',async()=>{
  api.mockImplementation(async(path,options)=>options?{sent:1,failed:0,previewed:0}:catalog);
  render(<EmailControl/>);
- const send=await screen.findByRole('button',{name:'Send all templates to me'});
+ const send=await screen.findByRole('button',{name:'Send all templates'});
  expect(screen.getByTitle('Email template preview')).toHaveAttribute('sandbox','');
  expect(api).toHaveBeenCalledExactlyOnceWith('/support/email-templates');
  fireEvent.click(send);

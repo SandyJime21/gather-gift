@@ -147,7 +147,12 @@ def suggestion_values(payload):
     currency=payload.get('currency','USD')
     if not isinstance(currency,str) or len(currency)!=3 or not currency.isalpha(): raise ValueError('Choose a three-letter currency.')
     result['currency']=currency.upper()
-    result['priority']=2;result['quantity']=1
+    try:
+        result['priority']=int(payload.get('priority',2));result['quantity']=int(payload.get('quantity',1))
+    except (TypeError,ValueError):
+        raise ValueError('Choose a positive quantity and a priority from 1 to 4.')
+    if result['priority'] not in (1,2,3,4) or not 1<=result['quantity']<=10000:
+        raise ValueError('Choose a quantity from 1 to 10,000 and priority from 1 to 4.')
     return result
 
 

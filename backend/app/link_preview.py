@@ -8,6 +8,7 @@ import json
 import re
 from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
+from flask import has_app_context,current_app
 from urllib.parse import urljoin, urlsplit, unquote
 
 
@@ -126,9 +127,17 @@ def basic_link_preview(url, host):
         'image_url': None, 'store_name': host.removeprefix('www.'), 'metadata_unavailable': True}
 
 
-def preview_link(url):
+def preview_link(url,allowed_hosts=None):
+    if allowed_hosts is None and has_app_context():
+        from .commerce_urls import validated_product_url
+        _,host=validated_product_url(url)
+        allowed_hosts={value.strip().lower() for value in current_app.config.get('PERMITTED_METADATA_DOMAINS','').split(',') if value.strip()}
+        if host not in allowed_hosts:
+            return basic_link_preview(url,host)
     for attempt in range(4):
         parsed, host, address = public_target(url)
+        if allowed_hosts is not None and host.lower() not in allowed_hosts:
+            raise ValueError('This store is not enabled for permitted metadata previews.')
         connection = PinnedHTTPSConnection(host, address)
         try:
             path = parsed.path or '/'

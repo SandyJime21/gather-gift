@@ -3,7 +3,7 @@
 Open **Developer & support portal → Email control** using the master account.
 
 - Preview all 15 current email variants, including plain text, HTML and the sample CSV attachment. Previews use the actual application mail functions with fake names, links, codes and gift data.
-- Send one template or all templates to the signed-in master account's email after confirmation. The API rejects alternative recipient addresses. Test messages have a `[Template preview]` subject prefix.
+- Send one selected template or all templates to the entered test recipient after confirmation. The recipient defaults to the signed-in master address, and every address is validated and checked for opt-out. Test messages have a `[Template preview]` subject prefix.
 - SMTP must be configured for inbox delivery. With `MAIL_OUTBOX_DIR`, the response reports files written to the development outbox instead of claiming inbox delivery.
 - Search unsubscribed addresses, stop delivery, or restore delivery at a recipient's request. These controls and sample sends are master-only and audited.
 - Every outgoing email includes a signed preferences link in plain text, HTML where present, and the `List-Unsubscribe` header. Visiting the page does not change delivery; the recipient must confirm the action. No login is required.
@@ -18,7 +18,7 @@ API routes:
 | Method | Route | Access |
 | --- | --- | --- |
 | GET | `/api/support/email-templates` | Master account |
-| POST | `/api/support/email-templates/send` | Master account; self recipient only |
+| POST | `/api/support/email-templates/send` | Master account; validated test recipient |
 | GET, POST | `/api/support/email-suppressions` | Master account |
 | GET, POST | `/api/email-preferences/<token>` | Signed recipient link; POST requires CSRF |
 # HTML block editor

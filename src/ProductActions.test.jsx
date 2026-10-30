@@ -5,6 +5,16 @@ import {api} from './lib/api.js';
 vi.mock('./lib/api.js',()=>({api:vi.fn()}));
 afterEach(()=>vi.clearAllMocks());
 const product={id:5,name:'Puzzle',estimated_price:'20',currency:'USD',product_url:'https://example.com/puzzle'};
+it('sends suggestions to claimed adults without editing their lists',async()=>{
+ api.mockResolvedValue({});
+ render(<ProductActions product={product} listOnly profiles={[{id:8,display_name:'Joined adult',can_edit:false,can_suggest:true}]}/>);
+ fireEvent.click(screen.getByRole('button',{name:'+ Wish'}));
+ fireEvent.change(screen.getByLabelText('Whose wishlist?'),{target:{value:'8'}});
+ expect(screen.queryByLabelText('Wishlist')).not.toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Send suggestion'}));
+ expect(await screen.findByRole('status')).toHaveTextContent('Suggestion sent');
+ expect(api).toHaveBeenCalledWith('/profiles/8/suggestions',expect.objectContaining({method:'POST'}));
+});
 it('adds a Discover product privately to Buying now',async()=>{
  api.mockResolvedValue({});
  render(<ProductActions product={product} profiles={[]} selfName="Alex"/>);
