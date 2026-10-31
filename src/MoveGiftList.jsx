@@ -1,0 +1,10 @@
+import {useState} from 'react';
+import {Alert,Button,Form} from 'react-bootstrap';
+import {api} from './lib/api.js';
+export default function MoveGiftList({item,onMoved}){
+ const [open,setOpen]=useState(false),[lists,setLists]=useState([]),[selected,setSelected]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+ if(!item.can_edit)return null;
+ async function start(){setOpen(true);setBusy(true);setError('');try{const result=await api('/profiles/'+item.profile_id+'/wishlists');setLists(result.wishlists||[]);setSelected(String(result.wishlists?.[0]?.id||''));}catch(e){setError(e.message);}finally{setBusy(false);}}
+ async function move(){setBusy(true);setError('');try{const result=await api('/items/'+item.id+'/move-list',{method:'POST',body:JSON.stringify({wishlist_id:Number(selected)})});setNotice('Moved to '+result.list_title+'.');window.dispatchEvent(new Event('wishlist-updated'));window.dispatchEvent(new Event('shopping-updated'));await onMoved?.();}catch(e){setError(e.message);}finally{setBusy(false);}}
+ return <section className="mt-3">{!open?<Button type="button" size="sm" variant="outline-secondary" onClick={start}>Move to another list</Button>:<div className="border rounded p-3">{error&&<Alert variant="danger">{error}</Alert>}{notice&&<p role="status">{notice}</p>}<Form.Group controlId={'move-gift-list-'+item.id}><Form.Label>List for {item.recipient||'this family member'}</Form.Label><Form.Select value={selected} disabled={busy} onChange={e=>setSelected(e.target.value)}>{lists.map(list=><option key={list.id} value={list.id}>{list.title}</option>)}</Form.Select></Form.Group><p className="small text-secondary mt-2">Moves this gift to the selected list for the same person. Its sharing rules apply; personal wish privacy stays unchanged. Duplicate names or links are blocked.</p>{!busy&&!lists.length&&<p>Create a list for this member first.</p>}<Button type="button" size="sm" disabled={busy||!selected} onClick={move}>{busy?'Moving...':'Move gift'}</Button></div>}</section>;
+}

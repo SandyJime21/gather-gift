@@ -19,15 +19,15 @@ from .wishlist_letters import managed_home
 def theme_metadata(payload,previous=None):
     previous=previous or {}
     purpose=payload.get('purpose',previous.get('purpose','app'))
-    if purpose not in ('app','letter'):
-        raise ValueError('Choose app theme or wishlist letter art.')
+    if purpose not in ('app','letter','list'):
+        raise ValueError('Choose app theme, family list background or wishlist letter art.')
     try:
         price=Decimal(str(payload.get('price',Decimal(previous.get('price_cents',0))/100)))
         if not price.is_finite() or price<0 or price>1000 or price*100 != (price*100).to_integral_value() or (price>0 and price<Decimal('0.50')):
             raise ValueError()
     except (InvalidOperation,ValueError,TypeError):
         raise ValueError('Choose Free or a USD price from 0.50 to 1000.00, with at most two decimal places.')
-    if purpose=='app' and price:
+    if purpose in ('app','list') and price:
         raise ValueError('Prices are available for letter art. App themes remain free.')
     active=payload.get('active',previous.get('active',True))
     if active in ('true','false'):
@@ -71,7 +71,7 @@ def remember_free_art(home_id,row,user_id):
 @api.get('/support/themes')
 @superuser_required
 def developer_theme_catalog():
-    return jsonify(themes=[dict(key='t'+str(row.id),id=row.id,**row.data) for row in SharedTheme.query.order_by(SharedTheme.id.desc()).all()])
+    return jsonify(themes=[dict(key='t'+str(row.id),id=row.id,**row.data) for row in SharedTheme.query.order_by(SharedTheme.id.desc()).all() if row.data.get('purpose')!='site-palette'])
 
 
 @api.patch('/support/themes/<int:theme_id>')

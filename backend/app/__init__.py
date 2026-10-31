@@ -141,6 +141,11 @@ def create_app(test_config=None):
     from . import email_control
     from . import universal_gifts
     from . import commerce
+    from . import family_collections
+    from . import diagnostic_view
+    from . import list_transfer
+    from . import app_appearance
+    from . import account_switcher
     app.register_blueprint(api, url_prefix="/api")
     from .advertising import ad_api
     app.register_blueprint(ad_api, url_prefix="/api")

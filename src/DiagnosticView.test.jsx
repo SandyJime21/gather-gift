@@ -1,0 +1,21 @@
+import {fireEvent,render,screen} from '@testing-library/react';
+import {expect,it,vi} from 'vitest';
+import DiagnosticEntry from './DiagnosticView.jsx';
+import {api} from './lib/api.js';
+vi.mock('./lib/api.js',()=>({api:vi.fn()}));
+it('prefills ticket context and lets a superuser select a customer by name or email',async()=>{
+ api.mockResolvedValue({users:[{id:2,name:'Sam',email:'sam@example.com',kind:'member'},{id:3,name:'Staff',email:'staff@example.com',kind:'staff'}]});
+ render(<DiagnosticEntry initialEmail="customer@example.com" initialReason="Ticket #12: Wishlist issue" householdId={9}/>);
+ expect(screen.getByLabelText('Family account email')).toHaveValue('customer@example.com');
+ expect(screen.getByLabelText('Testing reason')).toHaveValue('Ticket #12: Wishlist issue');
+ expect(screen.getByText('9')).toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText('Search users by name or email'),{target:{value:'Sam'}});
+ fireEvent.click(screen.getByRole('button',{name:'Search users'}));
+ expect(await screen.findByText('sam@example.com')).toBeInTheDocument();
+ expect(screen.queryByText('staff@example.com')).not.toBeInTheDocument();
+ expect(api).toHaveBeenCalledWith('/support/users?q=Sam');
+ fireEvent.click(screen.getByRole('button',{name:'Select user'}));
+ expect(screen.getByLabelText('Family account email')).toHaveValue('sam@example.com');
+ expect(screen.getByLabelText('Testing reason')).toHaveValue('Ticket #12: Wishlist issue');
+ expect(api.mock.calls.some(([path])=>path==='/support/diagnostic-view')).toBe(false);
+});

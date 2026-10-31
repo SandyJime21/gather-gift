@@ -42,3 +42,12 @@ it('does not unsubscribe just by opening an email link and supports restoring de
  await waitFor(()=>expect(screen.getByRole('button',{name:'Unsubscribe from all emails'})).toBeInTheDocument());
  expect(api).toHaveBeenCalledWith('/email-preferences/signed-token',{method:'POST',body:JSON.stringify({unsubscribed:false})});
 });
+
+it('allows selected samples to another inbox when the developers own address is unsubscribed',async()=>{
+ api.mockResolvedValue({...catalog,unsubscribed:true});
+ render(<EmailControl/>);
+ await screen.findByRole('button',{name:'Send selected template'});
+ expect(screen.getByRole('button',{name:'Send selected template'})).toBeDisabled();
+ fireEvent.change(screen.getByLabelText('Test recipient email'),{target:{value:'qa@example.com'}});
+ expect(screen.getByRole('button',{name:'Send selected template'})).toBeEnabled();
+});

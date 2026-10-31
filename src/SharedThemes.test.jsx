@@ -26,3 +26,15 @@ it('lets the developer change a published letter design to free',async()=>{
  const body=api.mock.calls.find(([,options])=>options?.method==='PATCH')[1].body;
  expect(body.get('price')).toBe('0');
 });
+
+it('publishes reusable family list backgrounds separately from app and letter designs',async()=>{
+ api.mockResolvedValue({themes:[]});
+ render(<ThemeStudio/>);
+ fireEvent.change(screen.getByLabelText('This design is for'),{target:{value:'list'}});
+ fireEvent.change(screen.getByLabelText('Design name'),{target:{value:'Christmas ribbons'}});
+ expect(screen.getByLabelText('Family list background artwork')).toBeInTheDocument();
+ fireEvent.submit(screen.getByLabelText('Design name').closest('form'));
+ await waitFor(()=>expect(api).toHaveBeenCalledWith('/support/themes',expect.objectContaining({method:'POST'})));
+ const body=api.mock.calls.find(([,options])=>options?.method==='POST')[1].body;
+ expect(body.get('purpose')).toBe('list');expect(body.get('price')).toBe('0');
+});

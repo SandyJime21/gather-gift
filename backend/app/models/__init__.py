@@ -629,3 +629,12 @@ class CommerceOutboundEvent(db.Model):
     merchant = db.Column(db.String(253), nullable=False)
     attribution_id = db.Column(db.String(32), nullable=False, unique=True)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow, index=True)
+
+class FamilyListCollection(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    household_id = db.Column(db.Integer, db.ForeignKey('household.id', ondelete='CASCADE'), nullable=False, index=True)
+    title = db.Column(db.String(160), nullable=False)
+    cover_url = db.Column(db.String(2000))
+    use_family_photo = db.Column(db.Boolean, nullable=False, default=True)
+    wishlist_ids = db.Column(db.JSON, nullable=False, default=list)
+    __table_args__ = (db.UniqueConstraint('household_id', 'title'),)

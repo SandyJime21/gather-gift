@@ -54,7 +54,7 @@ def resolve(url):
     original,host=validated_product_url(url)
     if already_affiliated(original) or not schema_ready():return original,'existing_link' if already_affiliated(original) else 'direct'
     settings={row.provider:row for row in CommerceIntegration.query.filter_by(enabled=True,approved=True).all()}
-    for key in PROVIDERS:
+    for key in list(PROVIDERS)+[key for key in settings if key.startswith('custom_')]:
         row=settings.get(key)
         if not row:continue
         provider=adapter(key,row)
@@ -134,6 +134,11 @@ def provider_rows():
                      'merchant_rules':row.merchant_rules,'reporting':instance.getAvailableReporting(),
                      'last_error':row.last_error,'last_error_at':row.last_error_at.isoformat() if row.last_error_at else None})
     from .search_providers import search_status
+    for key,row in saved.items():
+        if not key.startswith('custom_'):continue
+        info=row.merchant_rules or {}
+        instance=adapter(key,row)
+        rows.append({'id':key,'name':info.get('company_name','Custom company'),'implementation':'approved_link_templates','docs':info.get('website',''),'required_environment':[info['key_environment']] if info.get('key_environment') else [],'enabled':row.enabled,'approved':row.approved,'configured':instance.configured(),'status':'ready_for_approved_merchants' if row.enabled and row.approved and instance.configured() else 'disabled','capabilities':instance.capabilities,'merchant_rules':{k:v for k,v in info.items() if k in ('approved_merchants','excluded_merchants','links')},'company':{k:info.get(k,'') for k in ('company_name','website','publisher_id','key_environment')},'last_error':row.last_error})
     return rows+search_status()
 
 
@@ -177,14 +182,20 @@ def commerce_dashboard():
 @superuser_required
 def update_commerce_provider(provider_id):
     search_provider=provider_id in ('search_ebay','search_serpapi')
-    if provider_id not in PROVIDERS and not search_provider:return error('Provider not found.',404)
+    if provider_id not in PROVIDERS and not search_provider and not (provider_id.startswith('custom_') and db.session.get(CommerceIntegration,provider_id)):return error('Provider not found.',404)
     if not schema_ready():return error('Apply the commerce database migration before changing providers.',503)
     payload=request.get_json(silent=True) or {}
     if set(payload)-{'enabled','approved','merchant_rules'} or not payload or any(type(payload[key]) is not bool for key in ('enabled','approved') if key in payload):return error('Choose valid provider settings.',400)
     row=db.session.get(CommerceIntegration,provider_id)
     if not row:row=CommerceIntegration(provider=provider_id,enabled=False,approved=False,merchant_rules={});db.session.add(row)
     try:
-        if 'merchant_rules' in payload:row.merchant_rules=validate_rules(payload['merchant_rules'])
+        if 'merchant_rules' in payload:row.merchant_rules={**(row.merchant_rules or {}),**validate_rules(payload['merchant_rules'])} if provider_id.startswith('custom_') else validate_rules(payload['merchant_rules'])
+        if provider_id.startswith('custom_'):
+            import os
+            from urllib.parse import unquote
+            env=(row.merchant_rules or {}).get('key_environment')
+            secret=os.environ.get(env,'') if env else ''
+            if secret and any(secret in unquote(value) for value in (row.merchant_rules or {}).get('links',{}).values()):raise ValueError('Keep API secrets out of public tracking URLs.')
     except ValueError as exc:
         db.session.rollback()
         return error(str(exc),400)
@@ -193,6 +204,33 @@ def update_commerce_provider(provider_id):
     if row.enabled and not row.approved and not search_provider:
         db.session.rollback()
         return error('Confirm actual provider approval before enabling affiliate monetization.',400)
+    if provider_id.startswith('custom_') and row.enabled and not adapter(provider_id,row).configured():
+        db.session.rollback();return error('Add an issued tracking template before enabling this company.',400)
     record_audit(request.current_user.id,'commerce.provider_updated','commerce_provider',provider_id,details={'enabled':row.enabled,'approved':row.approved})
     db.session.commit()
     return jsonify(provider=next(row for row in provider_rows() if row['id']==provider_id))
+
+
+@api.post('/support/commerce/companies')
+@superuser_required
+def add_affiliate_company():
+    import re,os
+    from urllib.parse import unquote
+    if not schema_ready():return error('Install the matching commerce migration first.',503)
+    body=request.get_json(silent=True) or {}
+    if set(body)-{'company_name','website','tracking_template','publisher_id','key_environment','approved','enabled'}:return error('Enter company details and a server key reference only.',400)
+    name=body.get('company_name','');website=body.get('website','');template=body.get('tracking_template','');publisher=body.get('publisher_id','');env=body.get('key_environment','')
+    if not all(isinstance(v,str) for v in (name,website,template,publisher,env)) or not 1<=len(name.strip())<=120 or len(publisher)>200:return error('Enter a company name and valid details.',400)
+    if env and not re.fullmatch('[A-Z][A-Z0-9_]{2,79}',env):return error('Use the environment variable name, not the secret key value.',400)
+    approved=body.get('approved',False);enabled=body.get('enabled',False)
+    if type(approved)is not bool or type(enabled)is not bool or (enabled and not approved):return error('Confirm actual approval before enabling this company.',400)
+    try:
+        _,host=validated_product_url(website)
+        host=host.removeprefix('www.')
+        rules=validate_rules({'approved_merchants':[host],'links':{host:template} if template else {}})
+        if env and os.environ.get(env) and os.environ[env] in unquote(template):raise ValueError('Keep API secrets out of public tracking URLs.')
+    except ValueError as exc:return error(str(exc),400)
+    if enabled and not template:return error('An issued tracking template is required to enable link routing.',400)
+    row=CommerceIntegration(provider='custom_'+uuid4().hex[:16],enabled=enabled,approved=approved,merchant_rules={**rules,'company_name':name.strip(),'website':website,'publisher_id':publisher.strip(),'key_environment':env})
+    db.session.add(row);db.session.flush();record_audit(request.current_user.id,'commerce.company_added','commerce_provider',row.provider);db.session.commit()
+    return jsonify(provider=next(value for value in provider_rows() if value['id']==row.provider)),201

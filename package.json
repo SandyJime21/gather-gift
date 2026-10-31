@@ -1,7 +1,7 @@
 {
   "name": "family-gift-registry",
   "private": true,
-  "version": "0.1.0",
+  "version": "3.0.0",
   "type": "module",
   "scripts": {
     "start": "vite",
@@ -15,7 +15,8 @@
     "db:current": "node scripts/database.mjs current",
     "db:check": "node scripts/database.mjs check",
     "db:heads": "node scripts/database.mjs heads",
-    "ebay:check": "node scripts/check-ebay.mjs"
+    "ebay:check": "node scripts/check-ebay.mjs",
+    "release": "node scripts/release.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

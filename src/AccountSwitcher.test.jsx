@@ -1,0 +1,22 @@
+import {fireEvent,render,screen,within} from '@testing-library/react';
+import {Dropdown} from 'react-bootstrap';
+import {expect,it,vi} from 'vitest';
+import AccountSwitcher from './AccountSwitcher.jsx';
+import {api} from './lib/api.js';
+vi.mock('./lib/api.js',()=>({api:vi.fn()}));
+it('adds an account with a separate email after credential verification without switching automatically',async()=>{
+ const user={id:1,name:'Staff',is_support:true};
+ const accounts=[{...user,email:'staff@example.com',current:true}];
+ api.mockImplementation(async(path,options)=>({accounts:options?[...accounts,{id:2,name:'Family me',email:'family@example.com',is_support:false}]:accounts}));
+ render(<Dropdown show><Dropdown.Toggle>Profile</Dropdown.Toggle><Dropdown.Menu><AccountSwitcher user={user}/></Dropdown.Menu></Dropdown>);
+ fireEvent.click(await screen.findByText('Add account'));
+ const dialog=await screen.findByRole('dialog');
+ fireEvent.change(within(dialog).getByLabelText('Account email'),{target:{value:'family@example.com'}});
+ fireEvent.change(within(dialog).getByLabelText('Account password'),{target:{value:'verified-password'}});
+ fireEvent.click(within(dialog).getByRole('button',{name:'Add account'}));
+ expect(await within(dialog).findByText('Account added. Choose it below to switch.')).toBeInTheDocument();
+ expect(api).toHaveBeenCalledWith('/auth/accounts/add',{method:'POST',body:JSON.stringify({email:'family@example.com',password:'verified-password',create:false})});
+ expect(within(dialog).getByLabelText('Account password')).toHaveValue('');
+ expect(within(dialog).getByRole('button',{name:'Family me - Family account'})).toBeInTheDocument();
+ expect(api.mock.calls.some(([path])=>path==='/auth/accounts/switch')).toBe(false);
+});

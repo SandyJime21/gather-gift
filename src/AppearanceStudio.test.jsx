@@ -1,0 +1,65 @@
+import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
+import {afterEach,expect,it,vi} from 'vitest';
+import AppearanceStudio from './AppearanceStudio.jsx';
+import {DisplayProvider} from './DisplayPreferences.jsx';
+import {appearanceDefaults} from './lib/appearance.js';
+import {api} from './lib/api.js';
+vi.mock('./lib/api.js',()=>({api:vi.fn()}));
+afterEach(()=>{cleanup();vi.clearAllMocks();localStorage.clear();document.documentElement.removeAttribute('data-bs-theme');});
+it('previews dark colors without publishing, then publishes only on request',async()=>{
+ api.mockImplementation(async(path,options)=>({appearance:options?JSON.parse(options.body):structuredClone(appearanceDefaults)}));
+ render(<DisplayProvider><AppearanceStudio/></DisplayProvider>);
+ await waitFor(()=>expect(api).toHaveBeenCalledWith('/support/app-appearance'));
+ fireEvent.change(screen.getByLabelText('Palette to edit'),{target:{value:'dark'}});
+ fireEvent.change(screen.getByLabelText('Page background'),{target:{value:'#201929'}});
+ fireEvent.click(screen.getByRole('button',{name:'Preview now'}));
+ await waitFor(()=>expect(document.documentElement).toHaveAttribute('data-bs-theme','dark'));
+ expect(document.documentElement.style.getPropertyValue('--gg-background')).toBe('#201929');
+ expect(api.mock.calls.some(([,options])=>options?.method==='PATCH')).toBe(false);
+ fireEvent.click(screen.getByLabelText('I approve this light and dark palette for publishing'));
+ fireEvent.click(screen.getByRole('button',{name:'Publish app colors'}));
+ expect(await screen.findByText('App colors published. Other browsers receive them when they reload.')).toBeInTheDocument();
+ expect(JSON.parse(api.mock.calls.find(([,options])=>options?.method==='PATCH')[1].body).dark.background).toBe('#201929');
+});
+it('provides a Christmas palette without publishing it automatically',async()=>{
+ api.mockResolvedValue({appearance:structuredClone(appearanceDefaults)});
+ render(<DisplayProvider><AppearanceStudio/></DisplayProvider>);
+ await waitFor(()=>expect(api).toHaveBeenCalledWith('/support/app-appearance'));
+ fireEvent.click(screen.getByRole('button',{name:'Christmas preset'}));
+ expect(screen.getByLabelText('Season')).toHaveValue('christmas');
+ expect(screen.getByText('A little Christmas magic')).toBeInTheDocument();
+ expect(api.mock.calls.some(([,options])=>options?.method==='PATCH')).toBe(false);
+});
+it('clears approval after edits and blocks unreadable custom colors',async()=>{
+ api.mockResolvedValue({appearance:structuredClone(appearanceDefaults)});
+ render(<DisplayProvider><AppearanceStudio/></DisplayProvider>);
+ await waitFor(()=>expect(api).toHaveBeenCalledWith('/support/app-appearance'));
+ expect(screen.getByRole('button',{name:'Publish app colors'})).toBeDisabled();
+ fireEvent.click(screen.getByLabelText('I approve this light and dark palette for publishing'));
+ expect(screen.getByRole('button',{name:'Publish app colors'})).toBeEnabled();
+ fireEvent.change(screen.getByLabelText('Buttons & links'),{target:{value:'#ffffff'}});
+ expect(screen.getByLabelText('I approve this light and dark palette for publishing')).not.toBeChecked();
+ expect(screen.getByRole('button',{name:'Publish app colors'})).toBeDisabled();
+ expect(screen.getByText(/Improve contrast before publishing/)).toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:/Sea glass palette/}));
+ expect(screen.getByText('Both palettes pass text and link contrast checks.')).toBeInTheDocument();
+});
+
+it('saves pasted hex colors as favorites and restores them after reset',async()=>{
+ api.mockResolvedValue({appearance:structuredClone(appearanceDefaults)});
+ render(<DisplayProvider><AppearanceStudio/></DisplayProvider>);
+ await waitFor(()=>expect(api).toHaveBeenCalledWith('/support/app-appearance'));
+ const input=screen.getByLabelText('Page background hex');
+ fireEvent.change(input,{target:{value:'#eef4ff'}});fireEvent.blur(input);
+ expect(screen.getByLabelText('Page background')).toHaveValue('#eef4ff');
+ fireEvent.change(screen.getByLabelText('Palette name'),{target:{value:'My sky'}});
+ fireEvent.click(screen.getByRole('button',{name:'Save favorite palette'}));
+ expect(JSON.parse(localStorage.getItem('gg-favorite-palettes'))[0].value.light.background).toBe('#eef4ff');
+ fireEvent.click(screen.getByRole('button',{name:'Reset to default colors'}));
+ expect(screen.getByLabelText('Page background')).toHaveValue(appearanceDefaults.light.background);
+ fireEvent.click(screen.getByRole('button',{name:'Use My sky'}));
+ expect(screen.getByLabelText('Page background')).toHaveValue('#eef4ff');
+ fireEvent.click(screen.getByRole('button',{name:'Undo color changes'}));
+ expect(screen.getByLabelText('Page background')).toHaveValue(appearanceDefaults.light.background);
+ expect(api.mock.calls.some(([,options])=>options?.method==='PATCH')).toBe(false);
+});

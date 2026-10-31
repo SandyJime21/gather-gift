@@ -1,6 +1,6 @@
 import {afterEach,expect,it,vi} from 'vitest';
 import {render,screen,fireEvent,waitFor,within} from '@testing-library/react';
-import {MemoryRouter} from 'react-router-dom';
+import {MemoryRouter,Link,useLocation} from 'react-router-dom';
 import {CreateWishlist} from './App.jsx';
 import {clearCsrfToken} from './lib/api.js';
 import CreateWishlistManager from './CreateWishlist.jsx';
@@ -52,12 +52,14 @@ it('assigns an existing list name only to members who do not already have it',as
  fireEvent.click(screen.getByRole('button',{name:'New list'}));
  fireEvent.click(screen.getByRole('button',{name:'Assign existing'}));
  await waitFor(()=>expect(screen.getByLabelText('Existing list')).toHaveValue('11'));
+ expect(screen.getByLabelText('Mia / Family')).toBeChecked();
+ expect(screen.getByLabelText('Pretzel / Family')).toBeChecked();
  expect(screen.getByLabelText('Mia / Family')).toBeDisabled();
- expect(screen.getByLabelText('Pretzel / Family')).toBeDisabled();
- fireEvent.click(screen.getByRole('button',{name:'Select all managed members'}));
+ expect(within(screen.getByLabelText('Existing list')).getAllByRole('option',{name:'Christmas'})).toHaveLength(1);
+ fireEvent.click(screen.getByLabelText('Sam / Family'));
+ expect(await screen.findByText('Christmas assigned to Sam.')).toBeInTheDocument();
  expect(screen.getByLabelText('Sam / Family')).toBeChecked();
- fireEvent.click(screen.getByRole('button',{name:'Assign list name'}));
- expect(await screen.findByRole('link',{name:'Sam: Christmas'})).toHaveAttribute('href','/profiles/2?wishlist=22');
+ expect(screen.queryByRole('link',{name:'Sam: Christmas'})).not.toBeInTheDocument();
  expect(sent).toEqual({source_wishlist_id:11,profile_ids:[2],allow_child_items:true});
 });
 
@@ -92,4 +94,38 @@ it('only deletes a managed list after confirmation and allows cancelling',async(
  expect(await screen.findByText('List deleted. Gifts on other lists were kept.')).toBeInTheDocument();
  expect(deleted).toBe(true);
  expect(screen.queryByRole('button',{name:'Delete list'})).not.toBeInTheDocument();
+});
+
+it('shows a family list once and lets me assign myself when only another adult has it',async()=>{
+ clearCsrfToken();let sent;
+ vi.stubGlobal('fetch',vi.fn(async(url,options={})=>{
+  const result=url==='/api/auth/csrf'?{csrf_token:'test'}:url==='/api/profiles/1/wishlists'?{wishlists:[]}:url==='/api/profiles/2/wishlists'?{wishlists:[{id:22,title:'Christmas'}]}:url==='/api/wishlists/batch'?(sent=JSON.parse(options.body),{wishlists:[{id:11,profile_id:1,name:'Me',title:'Christmas'}]}):{};
+  return {ok:true,json:async()=>result};
+ }));
+ render(<MemoryRouter><CreateWishlistManager profiles={[{id:1,display_name:'Me',household_id:9,household_name:'Family',can_edit:true,is_me:true,is_adult:true},{id:2,display_name:'Partner',household_id:9,household_name:'Family',can_edit:false,is_adult:true}]}/></MemoryRouter>);
+ fireEvent.click(screen.getByRole('button',{name:'New list'}));
+ fireEvent.click(screen.getByRole('button',{name:'Assign existing'}));
+ await screen.findByRole('option',{name:'Christmas'});
+ expect(screen.getByLabelText('Partner / Family')).toBeChecked();
+ expect(screen.getByLabelText('Me / Family')).not.toBeChecked();
+ fireEvent.click(screen.getByLabelText('Me / Family'));
+ await waitFor(()=>expect(sent).toEqual({source_wishlist_id:22,profile_ids:[1],allow_child_items:true}));
+});
+
+function CurrentPath(){return <output data-testid="current-path">{useLocation().pathname}</output>;}
+it('keeps assignment inside the dialog and restores an unchecked box when saving fails',async()=>{
+ clearCsrfToken();
+ vi.stubGlobal('fetch',vi.fn(async(url,options={})=>{
+  if(url==='/api/wishlists/batch')return {ok:false,status:500,json:async()=>({error:'Assignment failed'})};
+  return {ok:true,json:async()=>url==='/api/auth/csrf'?{csrf_token:'test'}:url==='/api/profiles/1/wishlists'?{wishlists:[{id:11,title:'Christmas'}]}:{wishlists:[]}};
+ }));
+ render(<MemoryRouter initialEntries={['/settings']}><Link to="/"><CreateWishlistManager profiles={[{id:1,display_name:'Mia',household_name:'Family',can_edit:true,is_adult:true},{id:2,display_name:'Sam',household_name:'Family',can_edit:true,is_adult:true}]}/></Link><CurrentPath/></MemoryRouter>);
+ fireEvent.click(screen.getByRole('button',{name:'New list'}));
+ fireEvent.click(screen.getByRole('button',{name:'Assign existing'}));
+ await screen.findByRole('option',{name:'Christmas'});
+ fireEvent.click(screen.getByLabelText('Sam / Family'));
+ expect(await screen.findByText('Assignment failed')).toBeInTheDocument();
+ expect(screen.getByLabelText('Sam / Family')).not.toBeChecked();
+ expect(screen.getByTestId('current-path')).toHaveTextContent('/settings');
+ expect(screen.getByRole('dialog')).toBeInTheDocument();
 });

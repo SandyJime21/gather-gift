@@ -17,8 +17,10 @@ def create_family_lists():
     source_id = payload.get('source_wishlist_id')
     if source_id is not None:
         source = db.session.get(Wishlist, source_id) if type(source_id) is int else None
-        if not source or profile_access(parent, source.profile_id, write=True) is None:
-            return error('Choose a source list you manage.', 403)
+        from .adult_family import family_ids
+        in_family=source and HouseholdProfileAccess.query.filter(HouseholdProfileAccess.profile_id==source.profile_id,HouseholdProfileAccess.household_id.in_(family_ids(parent))).first()
+        if not source or not in_family or profile_access(parent, source.profile_id) is None:
+            return error('Choose an accessible list in your own family.', 403)
         title = source.title
     allow = payload.get('allow_child_items', False)
     if (not isinstance(title, str) or not 1 <= len(title.strip()) <= 160

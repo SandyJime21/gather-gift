@@ -39,3 +39,19 @@ it('opens joined adult details read-only with creator removal available',async()
  expect(screen.getByLabelText('Account email')).toBeDisabled();
  expect(screen.getByRole('button',{name:'Remove from family'})).toBeEnabled();
 });
+
+it('tries the selected custom cartoon after a photo fails, then stops retrying broken images',()=>{
+ const {container}=render(<MemberAvatar name="Sam" photo="/missing.jpg" avatarKey="a17"/>);
+ fireEvent.error(container.querySelector('img'));
+ expect(container.querySelector('img')).toHaveAttribute('src','/api/avatars/17/art');
+ fireEvent.error(container.querySelector('img'));
+ expect(container.querySelector('img')).toBeNull();
+ expect(container).toHaveTextContent('S');
+});
+it('shows the chosen built-in icon after a photo fails and retries a replacement photo',()=>{
+ const {container,rerender}=render(<MemberAvatar photo="/missing.jpg" avatarKey="cat"/>);
+ fireEvent.error(container.querySelector('img'));
+ expect(container).toHaveTextContent('\ud83d\udc31');
+ rerender(<MemberAvatar photo="/new.jpg" avatarKey="cat"/>);
+ expect(container.querySelector('img')).toHaveAttribute('src','/new.jpg');
+});

@@ -1,0 +1,6 @@
+import {useState} from 'react';
+export default function PortalNavigation({section,onSelect,superuser}){
+ const [open,setOpen]=useState(false);
+ const groups=[['Support',[['tickets','Support workspace'],['family','Family & staff invitations'],['logs','Activity & diagnostics']]],...(superuser?[['Commerce',[['commerce','Affiliate Management'],['money','Money & Stripe'],['ads','Advertising']]],['Experience',[['theme','Themes & list artwork'],['pictures','Profile artwork'],['email','Email control'],['assistant','Assistant chats']]],['Administration',[['accounts','User accounts']]]]:[])];
+ return <aside className="portal-sidebar"><button type="button" className="btn btn-outline-secondary portal-menu-toggle" aria-expanded={open} aria-controls="portal-navigation" onClick={()=>setOpen(!open)}>Portal menu</button><nav id="portal-navigation" className={open?'is-open':''} aria-label="Portal sections">{groups.map(([label,items])=><section key={label}><h2 className="small-label">{label}</h2>{items.map(([key,name])=><button type="button" key={key} aria-current={(section===key||(key==='tickets'&&section==='access'))?'page':undefined} onClick={()=>{onSelect(key);setOpen(false);}}>{name}</button>)}</section>)}</nav></aside>;
+}

@@ -67,3 +67,21 @@ def test_assign_name_creates_independent_empty_lists_and_skips_duplicates(app):
     with app.app_context():
         assert Wishlist.query.count() == count
     assert mutate(stranger, 'POST', '/api/wishlists/batch', payload).status_code == 403
+
+
+def test_assign_self_from_another_adults_family_list_without_editing_their_list(app):
+    from backend.tests.test_linked_adults import joined_family
+    owner,adult,_,home,partner,_,_,_=joined_family(app)
+    source=mutate(adult,'POST',f"/api/profiles/{partner['id']}/wishlists",{'title':'Christmas'}).json['wishlist']
+    from backend.app.models import PersonProfile,HouseholdProfileAccess
+    owner_id=owner.get('/api/auth/me').json['user']['id']
+    with app.app_context():
+        own_profile=PersonProfile(display_name='Creator',is_adult=True,account_user_id=owner_id)
+        db.session.add(own_profile);db.session.flush()
+        db.session.add(HouseholdProfileAccess(household_id=home['id'],profile_id=own_profile.id))
+        db.session.commit();own={'id':own_profile.id}
+    response=mutate(owner,'POST','/api/wishlists/batch',{'source_wishlist_id':source['id'],'profile_ids':[own['id']],'allow_child_items':False})
+    assert response.status_code==201,response.json
+    assert response.json['wishlists'][0]['title']=='Christmas'
+    assert response.json['wishlists'][0]['profile_id']==own['id']
+    assert mutate(owner,'PATCH',f"/api/wishlists/{source['id']}",{'title':'Cannot change adult list'}).status_code==404

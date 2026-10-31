@@ -114,8 +114,8 @@ def list_user_accounts():
     query = User.query
     term = request.args.get('q', '').strip()[:100]
     if term:
-        like = '%' + term.replace('%', '').replace('_', '') + '%'
-        query = query.filter(or_(User.name.ilike(like), User.email.ilike(like)))
+        like = '%' + term.replace('!', '!!').replace('%', '!%').replace('_', '!_') + '%'
+        query = query.filter(or_(User.name.ilike(like, escape='!'), User.email.ilike(like, escape='!')))
     rows = query.order_by(User.created_at.desc()).limit(200).all()
     return jsonify({
         'total': db.session.query(db.func.count(User.id)).scalar(),

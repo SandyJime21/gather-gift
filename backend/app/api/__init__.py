@@ -120,7 +120,7 @@ def restrict_child_session():
         if not controls_for(user)['game_invites']:
             return error('Ask your parent to allow game invitations.', 403)
     if user and user.is_child and request.endpoint not in {
-        'api.csrf', 'api.current_user', 'api.logout', 'api.child_me', 'api.child_add_gift', 'api.child_add_link', 'api.child_gift_search', 'api.child_pet_add_gift', 'api.child_pet_remove_gift', 'api.exit_child_mode', 'api.request_parent_pin_reset', 'api.confirm_parent_pin_reset', 'api.child_profiles', 'api.switch_child_profile', 'api.theme_art', 'api.child_game_notifications', 'api.child_game_notification_read', 'api.avatar_art', 'api.child_profile_photo'
+        'api.public_app_appearance', 'api.csrf', 'api.current_user', 'api.logout', 'api.child_me', 'api.child_add_gift', 'api.child_add_link', 'api.child_gift_search', 'api.child_pet_add_gift', 'api.child_pet_remove_gift', 'api.exit_child_mode', 'api.request_parent_pin_reset', 'api.confirm_parent_pin_reset', 'api.child_profiles', 'api.switch_child_profile', 'api.theme_art', 'api.child_game_notifications', 'api.child_game_notification_read', 'api.avatar_art', 'api.child_profile_photo'
     }:
         return error("Child accounts can only view approved wishlists and add gift ideas.", 403)
 
@@ -139,6 +139,7 @@ def authenticated(view):
             return error("Please sign in through the correct portal.", 403)
         if user.is_support and not (
             request.path.startswith("/api/support/")
+            or request.path.startswith("/api/auth/accounts")
             or request.path in {"/api/auth/me", "/api/auth/logout"}
         ):
             return error("Support accounts must use the separate support portal.", 403)
@@ -514,10 +515,10 @@ def item_dict(item, user):
         "created_at": item.created_at.isoformat() if item.created_at else None,
         "updated_at": item.updated_at.isoformat() if item.updated_at else None,
     }
-    if data["list_managed"]:
-        managed_lists = Wishlist.query.join(WishlistItemWishlist, WishlistItemWishlist.wishlist_id == Wishlist.id).filter(WishlistItemWishlist.item_id == item.id, Wishlist.share_publicly.isnot(None)).all()
-        if managed_lists:
-            data["family_only"] = not any(row.share_publicly for row in managed_lists)
+    attached_lists = Wishlist.query.join(WishlistItemWishlist, WishlistItemWishlist.wishlist_id == Wishlist.id).filter(WishlistItemWishlist.item_id == item.id).all()
+    managed_lists = [row for row in attached_lists if row.share_publicly is not None]
+    if managed_lists:
+        data["family_only"] = not any(row.share_publicly for row in managed_lists)
     recipient_access = profile_access(user, item.profile_id) is not None
     data["recipient_preferences"] = gift_guide(item.profile) if recipient_access else None
     data["recipient_photo_path"] = item.profile.photo_path if recipient_access else None
@@ -525,6 +526,10 @@ def item_dict(item, user):
     data["availability_alert"] = GiftAvailabilityAlert.query.filter_by(user_id=user.id, item_id=item.id, ready=False).first() is not None
     data["is_hearted"] = SavedGift.query.filter_by(user_id=user.id, item_id=item.id).first() is not None
     personal = PersonalWish.query.filter_by(item_id=item.id).first()
+    data["can_edit"] = personal.owner_id == user.id if personal else can_manage_wishes(user, item.profile)
+    data["personal_wish_id"] = personal.id if personal and personal.owner_id == user.id else None
+    data["can_view_sharing"] = personal.owner_id == user.id if personal else list_family_access(attached_lists[0],user) if attached_lists else can_manage_wishes(user,item.profile)
+    data["personal_visibility"] = personal.visibility if personal else None
     data["personal_wish"] = personal is not None
     data["personal_owner_id"] = personal.owner_id if personal else None
     from ..adult_family import followed_ids
@@ -540,6 +545,9 @@ def item_dict(item, user):
     data["households"] = [{"id": home.id, "name": home.name} for home in homes]
     home_ids = [home.id for home in homes]
     data["occasions"] = [link.occasion.name for link in item.occasions if link.occasion.household_id in home_ids]
+    data["list_titles"] = [row.title for row in attached_lists if list_is_shared(row) or list_family_access(row,user)]
+    if not data["occasions"] and data["list_titles"]:
+        data["occasions"] = data["list_titles"]
     data["occasion_details"] = [{"name": link.occasion.name, "date": link.occasion.event_date.isoformat() if link.occasion.event_date else None} for link in item.occasions if link.occasion.household_id in home_ids]
     creator = db.session.get(User, item.created_by_id) if item.created_by_id else None
     data["added_by"] = creator.name if creator else "Family wishlist"
@@ -735,7 +743,8 @@ def session_payload(user):
                     'photo_path':identity['photo_path'] if identity else None,
                     'avatar_key':identity['avatar_key'] if identity else None,
                     'child_mode_locked':bool(session.get('household_return_user_id')),
-                    'browsing_as':profile.display_name if active_id and profile else user.name},
+                    'browsing_as':profile.display_name if active_id and profile else user.name,
+                    'diagnostic_view':{'actor_name':session['diagnostic_view']['actor_name'],'expires_at':session['diagnostic_view']['expires_at'],'read_only':True} if session.get('diagnostic_view') else None},
             'households':homes, 'csrf_token':_csrf_token()}
 
 
@@ -2205,6 +2214,7 @@ def shopping_hub():
             WishlistItem.name.ilike(pattern),
             WishlistItem.store_name.ilike(pattern),
             WishlistItem.category.ilike(pattern),
+            WishlistItem.id.in_(db.session.query(PersonalWish.item_id).join(User, User.id == PersonalWish.owner_id).filter(User.name.ilike(pattern))),
             WishlistItem.profile_id.in_(db.session.query(HouseholdProfileAccess.profile_id).join(Household,
                 Household.id == HouseholdProfileAccess.household_id).join(HouseholdMembership,
                 HouseholdMembership.household_id == Household.id).filter(HouseholdMembership.user_id == user.id, Household.name.ilike(pattern))),
@@ -2255,10 +2265,7 @@ def shopping_hub():
     else:
         query = query.order_by(WishlistItem.created_at.desc())
     items = query.limit(200).all()
-    return jsonify({"items": [{
-        **item_dict(row, user),
-        "recipient": row.profile.display_name,
-    } for row in items if item_audience_allowed(row, request.current_user)]})
+    return jsonify({"items": [item_dict(row, user) for row in items if item_audience_allowed(row, request.current_user)]})
 
 
 @api.put("/budgets")
@@ -2886,6 +2893,9 @@ def staff_ticket_dict(ticket):
         **ticket_dict(ticket),
         "user_name": ticket.user.name,
         "user_email": ticket.user.email,
+        "households": [{"id":home.id,"name":home.name} for home in db.session.query(Household).join(HouseholdMembership,HouseholdMembership.household_id==Household.id).filter(
+            HouseholdMembership.user_id==ticket.user_id,
+            or_(HouseholdMembership.role.in_(('owner','admin','family_member','profile_manager')),HouseholdMembership.is_family_member.is_(True))).order_by(Household.name).all()],
         "assigned_to": {"id": ticket.assigned_to.id, "name": ticket.assigned_to.name} if ticket.assigned_to else None,
     }
 

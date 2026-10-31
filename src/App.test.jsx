@@ -135,6 +135,13 @@ describe("landing page", () => {
 
 describe("family gift planning flow", () => {
   it("registers, creates a household, and reserves a gift privately", async () => {
+    const familyFallback=fetch.getMockImplementation();
+    fetch.mockImplementation((url,options={})=>{
+      if(url==='/api/wishlist')return jsonResponse({hearted:[],private_gifts:[],family_profiles:[{id:21,display_name:'Mia',profile_type:'person',household_id:9,can_edit:true}]});
+      if(url==='/api/profiles/21/wishlists')return jsonResponse({wishlists:[{id:31,title:'Birthday',share_publicly:false}]});
+      if(url==='/api/wishlists/31/items')return familyFallback('/api/shopping',options);
+      return familyFallback(url,options);
+    });
     render(<App />);
     fireEvent.change(await screen.findByLabelText("Your name"), { target: { value: "Taylor Example" } });
     fireEvent.change(screen.getByLabelText("Email address"), { target: { value: "taylor@example.com" } });
@@ -162,7 +169,7 @@ describe("family gift planning flow", () => {
 
     fireEvent.click(screen.getByRole("link", { name: "My wishes" }));
 
-    expect(await screen.findByRole("heading", { name: 'My family wishes' })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: 'Family wishes' })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "Buying now" }));
     expect(await screen.findByText("On hold")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Buying now" })).not.toBeInTheDocument();
@@ -235,7 +242,7 @@ describe("separate support sign-in", () => {
       return jsonResponse({ error: `Unexpected request: ${url}` }, 404);
     }));
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Family & invites" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Family & staff invitations" }));
     fireEvent.change(await screen.findByLabelText("Invitee email"), { target: { value: "alex@example.com" } });
     fireEvent.change(screen.getByLabelText("Family name"), { target: { value: "The Rivera Family" } });
     fireEvent.change(screen.getByLabelText("Primary adult profile name"), { target: { value: "Alex Rivera" } });
@@ -272,7 +279,7 @@ describe("separate support sign-in", () => {
       return jsonResponse({ error: `Unexpected request: ${url}` }, 404);
     }));
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Family & invites" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Family & staff invitations" }));
     fireEvent.change(await screen.findByLabelText("Staff email address"), { target: { value: "new-staff@example.com" } });
     fireEvent.click(screen.getByRole("button", { name: "Create private invitation" }));
     expect(await screen.findByRole("textbox", { name: "Private invitation link" })).toHaveValue(
@@ -667,9 +674,9 @@ describe('personal wishes with a selected family audience', () => {
     render(<App />);
     expect(screen.queryByLabelText('Public to invited family members')).not.toBeInTheDocument();
     fireEvent.click(await screen.findByRole('button',{name:'Search gifts'}));
-    await screen.findByLabelText('Search for a gift');
-    fireEvent.change(screen.getByLabelText('Search for a gift'), { target: { value: 'Jewelry' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Find gifts' }));
+    await within(await screen.findByRole('dialog')).findByLabelText('Search for a gift');
+    fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('Search for a gift'), { target: { value: 'Jewelry' } });
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Find gifts' }));
     fireEvent.click(await screen.findByRole('button', { name: /\+ Wish/ }));
     await waitFor(() => expect(saved).toBeDefined());
     expect(saved.name).toBe('Jewelry');
@@ -869,8 +876,8 @@ it('sends an adult family gift as a suggestion instead of adding it directly',as
  fireEvent.change(screen.getByLabelText('Save to'),{target:{value:'family'}});
  fireEvent.change(screen.getByLabelText('For'),{target:{value:'7'}});
  expect(screen.getByText('They will approve this suggestion before it is added.')).toBeInTheDocument();
- fireEvent.change(screen.getByLabelText('Search for a gift'),{target:{value:'puzzle'}});
- fireEvent.click(screen.getByRole('button',{name:'Find gifts'}));
+ fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('Search for a gift'),{target:{value:'puzzle'}});
+ fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Find gifts'}));
  fireEvent.click(await screen.findByRole('button',{name:'+ Wish'}));
  expect(await screen.findByText('Suggestion sent.')).toBeInTheDocument();
  expect(suggestion.name).toBe('Suggested puzzle');
@@ -1035,4 +1042,45 @@ it('opens a child letter and saves a handwritten wish to that exact list',async(
  fireEvent.submit(name.closest('form'));
  expect(await screen.findByRole('heading',{name:'Bake cookies with Grandma'})).toBeInTheDocument();
  expect(added).toEqual({name:'Bake cookies with Grandma',description:'Chocolate chip cookies'});
+});
+
+it('offers manual and search gift entry without leaving My wishes',async()=>{
+ registered=true;window.history.replaceState({},'', '/');
+ render(<App/>);
+ fireEvent.click(await screen.findByRole('button',{name:'Add gift'}));
+ expect(screen.getByRole('button',{name:'Search gifts'})).toBeInTheDocument();
+ fireEvent.click(screen.getByRole('button',{name:'Enter manually'}));
+ const dialog=await screen.findByRole('dialog');
+ expect(within(dialog).getByText('Enter gift details')).toBeInTheDocument();
+ expect(within(dialog).getByLabelText('Wish name')).toBeInTheDocument();
+ expect(within(dialog).getByLabelText('Save to')).toHaveValue('me');
+ expect(window.location.pathname).toBe('/');
+});
+
+it('keeps store browsing visible in Discover without recommendations',async()=>{
+ registered=true;window.history.replaceState({},'', '/discover');
+ render(<App/>);
+ expect(await screen.findByRole('heading',{name:'Find gifts & browse stores'})).toBeInTheDocument();
+ expect(screen.getByText('Browse Google and more stores')).toBeInTheDocument();
+ expect(screen.getAllByRole('link',{name:'Browse store'}).length).toBeGreaterThan(0);
+});
+
+it('keeps Add gift in the Saved items toolbar and searches all accessible people',async()=>{
+ registered=true;window.history.replaceState({},'', '/gifting');
+ render(<App/>);
+ const button=await screen.findByRole('button',{name:'Add gift'});
+ expect(button.closest('.gifting-toolbar')).not.toBeNull();
+ fireEvent.click(button);
+ const dialog=await screen.findByRole('dialog');
+ expect(within(dialog).getByLabelText('Search gifts, people, or families')).toBeInTheDocument();
+ fireEvent.change(within(dialog).getByLabelText('Search gifts, people, or families'),{target:{value:'Mia'}});
+ await waitFor(()=>expect(fetch.mock.calls.some(([url])=>url.startsWith('/api/shopping?')&&url.includes('q=Mia')&&!url.includes('scope=following'))).toBe(true));
+});
+
+it('shows falling-gift artwork while the account is loading',()=>{
+ const fallback=fetch.getMockImplementation();
+ fetch.mockImplementation((url,options)=>url==='/api/auth/me'?new Promise(()=>{}):fallback(url,options));
+ render(<App/>);
+ expect(screen.getByRole('heading',{name:'Stay tuned while we gather your gifts'})).toBeInTheDocument();
+ expect(screen.getByRole('status')).toHaveTextContent('Gathering the good stuff');
 });

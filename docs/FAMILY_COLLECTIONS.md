@@ -1,0 +1,11 @@
+# Family list collections
+
+My wishes has **Family collection** beside the list actions. Select a family, choose matching Christmas/Birthday/etc. lists, review the member checkboxes, name the collection and choose its artwork and sharing. Members' lists and gifts remain separate. This action changes follower sharing for the selected lists only; it does not grant child access or change any other adult's ownership. Claimed adults can only include lists they themselves manage. Existing collections with the same family/name are updated after the same permission checks. Another adult can join that collection with their own lists; everyone else’s participation and sharing stay intact.
+
+In the developer Theme Studio, choose "Family list background", upload artwork and publish it. Family collection settings then offer that artwork by name. A single selection applies behind the selected matching member lists, while "Show our family photo at the top" keeps the family photo above them. Existing HTTPS cover URLs remain supported. List designs are free and separate from app themes and letter art. Deactivating a design removes its background safely.
+
+Approved followers open a family in Following, then its collection card. They see only populated shared lists and the member profiles approved for them. Search, gift-type, member and minimum/maximum-price filters apply across the collection. Existing gift saving, holds and store actions are reused. Quick + Wish makes a private personal copy. Hidden lists are filtered on the server, not merely hidden in the browser. Existing reservations are not changed by collection updates.
+
+Sharing indicators sit in the gift action row and are supplied only for family viewers/owners; followers never get these controls. Individual personal wishes still use their owner's existing sharing menu.
+
+Migration `7c83a92db461`, parent `6ab4e1d092f3`, adds only `family_list_collection`. No existing table is replaced. Collection reads safely return an empty state before installation; writes explain that deployment migration is required. Do not migrate the shared Railway database before deploying its matching code: Render readiness checks schema head. Nothing in this local implementation applies that migration automatically.
